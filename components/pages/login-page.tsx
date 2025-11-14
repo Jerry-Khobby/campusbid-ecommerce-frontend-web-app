@@ -1,51 +1,64 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import { Mail, Lock, UserIcon } from "lucide-react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { useUser } from "@/lib/user-context"
-import { useNotification } from "@/lib/notification-context"
-import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
+import type React from "react";
+import { useEffect, useState } from "react";
+import { Mail, Lock, UserIcon } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useUser } from "@/lib/user-context";
+import { useNotification } from "@/lib/notification-context";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const redirectTo = searchParams.get("redirect") || "/home"
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") || "/home";
 
-  const [isSignUp, setIsSignUp] = useState(false)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [name, setName] = useState("")
-  const { login } = useUser()
-  const { addNotification } = useNotification()
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [name, setName] = useState("");
+  const { login } = useUser();
+  const { addNotification } = useNotification();
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (email && password && (!isSignUp || (isSignUp && password === confirmPassword && name))) {
-      login(email, password, name || "User")
-      addNotification(isSignUp ? "Account created successfully!" : "Logged in successfully!", "success")
-      router.push(redirectTo)
+    e.preventDefault();
+    if (
+      email &&
+      password &&
+      (!isSignUp || (isSignUp && password === confirmPassword && name))
+    ) {
+      login(email, password, name || "User");
+      addNotification(
+        isSignUp ? "Account created successfully!" : "Logged in successfully!",
+        "success"
+      );
+      router.push(redirectTo);
     }
-  }
+  };
 
   return (
     <main className="w-full min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center px-4 py-8">
       <Card className="w-full max-w-md">
         <div className="p-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">CampusBid</h1>
-            <p className="text-muted-foreground">{isSignUp ? "Create your account" : "Welcome back"}</p>
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              CampusBid
+            </h1>
+            <p className="text-muted-foreground">
+              {isSignUp ? "Create your account" : "Welcome back"}
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignUp && (
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Full Name</label>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Full Name
+                </label>
                 <div className="relative">
                   <UserIcon
                     className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
@@ -63,9 +76,14 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Email</label>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Email
+              </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
+                <Mail
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+                  size={18}
+                />
                 <Input
                   type="email"
                   value={email}
@@ -77,9 +95,14 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Password</label>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Password
+              </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
+                <Lock
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+                  size={18}
+                />
                 <Input
                   type="password"
                   value={password}
@@ -90,7 +113,10 @@ export default function LoginPage() {
               </div>
               {!isSignUp && (
                 <div className="mt-2 text-right">
-                  <Link href="/forgot-password" className="text-sm text-accent hover:underline">
+                  <Link
+                    href="/forgot-password"
+                    className="text-sm text-accent hover:underline"
+                  >
                     Forgot password?
                   </Link>
                 </div>
@@ -99,7 +125,9 @@ export default function LoginPage() {
 
             {isSignUp && (
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Confirm Password</label>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Confirm Password
+                </label>
                 <div className="relative">
                   <Lock
                     className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
@@ -130,7 +158,9 @@ export default function LoginPage() {
                 <div className="w-full border-t border-border"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-card text-muted-foreground">Or continue with</span>
+                <span className="px-2 bg-card text-muted-foreground">
+                  Or continue with
+                </span>
               </div>
             </div>
 
@@ -139,7 +169,9 @@ export default function LoginPage() {
                 type="button"
                 variant="outline"
                 className="w-full bg-transparent"
-                onClick={() => addNotification("Google login coming soon!", "info")}
+                onClick={() =>
+                  addNotification("Google login coming soon!", "info")
+                }
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path
@@ -165,7 +197,9 @@ export default function LoginPage() {
                 type="button"
                 variant="outline"
                 className="w-full bg-transparent"
-                onClick={() => addNotification("Facebook login coming soon!", "info")}
+                onClick={() =>
+                  addNotification("Facebook login coming soon!", "info")
+                }
               >
                 <svg className="w-5 h-5" fill="#1877F2" viewBox="0 0 24 24">
                   <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
@@ -176,9 +210,15 @@ export default function LoginPage() {
                 type="button"
                 variant="outline"
                 className="w-full bg-transparent"
-                onClick={() => addNotification("Apple login coming soon!", "info")}
+                onClick={() =>
+                  addNotification("Apple login coming soon!", "info")
+                }
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
                 </svg>
               </Button>
@@ -188,7 +228,10 @@ export default function LoginPage() {
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-              <button onClick={() => setIsSignUp(!isSignUp)} className="text-accent font-semibold hover:underline">
+              <button
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-accent font-semibold hover:underline"
+              >
                 {isSignUp ? "Sign In" : "Sign Up"}
               </button>
             </p>
@@ -196,5 +239,5 @@ export default function LoginPage() {
         </div>
       </Card>
     </main>
-  )
+  );
 }
