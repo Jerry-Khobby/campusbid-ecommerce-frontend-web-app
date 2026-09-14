@@ -2,12 +2,13 @@
 
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Mail, Lock, UserIcon } from "lucide-react";
+import { Mail, Lock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@/lib/user-context";
 import { useNotification } from "@/lib/notification-context";
+import { ApiError } from "@/lib/api/client";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -20,23 +21,33 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [name, setName] = useState("");
-  const { login } = useUser();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { login, register } = useUser();
   const { addNotification } = useNotification();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      email &&
-      password &&
-      (!isSignUp || (isSignUp && password === confirmPassword && name))
-    ) {
-      login(email, password, name || "User");
-      addNotification(
-        isSignUp ? "Account created successfully!" : "Logged in successfully!",
-        "success"
-      );
+    if (!email || !password) return;
+    if (isSignUp && password !== confirmPassword) {
+      addNotification("Passwords do not match", "error");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (isSignUp) {
+        await register(email, password);
+        addNotification("Account created successfully!", "success");
+      } else {
+        await login(email, password);
+        addNotification("Logged in successfully!", "success");
+      }
       router.push(redirectTo);
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Something went wrong, please try again";
+      addNotification(message, "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -54,27 +65,6 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isSignUp && (
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <UserIcon
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
-                    size={18}
-                  />
-                  <Input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-            )}
-
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 Email
@@ -146,9 +136,10 @@ export default function LoginPage() {
 
             <Button
               type="submit"
+              disabled={isSubmitting}
               className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-2"
             >
-              {isSignUp ? "Create Account" : "Sign In"}
+              {isSubmitting ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"}
             </Button>
           </form>
 

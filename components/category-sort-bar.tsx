@@ -1,23 +1,18 @@
 "use client"
 
 import { Filter } from "lucide-react"
-import type { SortOption } from "@/lib/product-filters"
+import type { Category } from "@/lib/api/categories"
 
 interface CategorySortBarProps {
-  categories: string[]
+  categories: Category[]
   selectedCategory: string | null
   onSelectCategory: (category: string | null) => void
-  sortBy: SortOption
-  onChangeSortBy: (sortBy: SortOption) => void
 }
 
-export function CategorySortBar({
-  categories,
-  selectedCategory,
-  onSelectCategory,
-  sortBy,
-  onChangeSortBy,
-}: CategorySortBarProps) {
+// Only category filtering is offered here: the backend's product list has no
+// sort parameter (results are always ordered by createdAt descending) and
+// Product carries no distance field to sort by.
+export function CategorySortBar({ categories, selectedCategory, onSelectCategory }: CategorySortBarProps) {
   return (
     <div className="mb-6 flex flex-wrap gap-3 items-center">
       <div className="flex items-center gap-2">
@@ -36,30 +31,17 @@ export function CategorySortBar({
       </button>
       {categories.map((category) => (
         <button
-          key={category}
-          onClick={() => onSelectCategory(category)}
+          key={category.id}
+          onClick={() => onSelectCategory(category.name)}
           className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-            selectedCategory === category
+            selectedCategory === category.name
               ? "bg-accent text-accent-foreground"
               : "bg-muted text-muted-foreground hover:text-foreground"
           }`}
         >
-          {category}
+          {category.name}
         </button>
       ))}
-
-      <div className="ml-auto flex items-center gap-2">
-        <span className="text-sm font-semibold text-foreground">Sort:</span>
-        <select
-          value={sortBy}
-          onChange={(e) => onChangeSortBy(e.target.value as SortOption)}
-          className="px-3 py-1 rounded-lg bg-muted text-foreground text-sm font-medium border border-border"
-        >
-          <option value="distance">Nearest</option>
-          <option value="price-low">Price: Low to High</option>
-          <option value="price-high">Price: High to Low</option>
-        </select>
-      </div>
     </div>
   )
 }

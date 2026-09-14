@@ -3,12 +3,13 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/lib/cart-context";
-import { OrdersProvider } from "@/lib/orders-context";
 import { UserProvider } from "@/lib/user-context";
 import { NotificationProvider } from "@/lib/notification-context";
 import NotificationToast from "@/components/notification-toast";
 import BottomNavigation from "@/components/bottom-navigation";
 import MainContent from "@/components/main-content";
+import { Providers } from "./providers";
+import { NotificationsSocketBridge } from "@/components/notifications-socket-bridge";
 
 // Assigning to a const is required for Next's font-loader compiler plugin to
 // pick this up; the objects themselves aren't used directly. This self-hosts
@@ -30,19 +31,20 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased`}>
-        <NotificationProvider>
-          <UserProvider>
-            <CartProvider>
-              <OrdersProvider>
+        <Providers>
+          <NotificationProvider>
+            <UserProvider>
+              <CartProvider>
+                <NotificationsSocketBridge />
                 <div className="flex flex-col h-screen bg-background">
                   <MainContent>{children}</MainContent>
                   <BottomNavigation />
                   <NotificationToast />
                 </div>
-              </OrdersProvider>
-            </CartProvider>
-          </UserProvider>
-        </NotificationProvider>
+              </CartProvider>
+            </UserProvider>
+          </NotificationProvider>
+        </Providers>
       </body>
     </html>
   );

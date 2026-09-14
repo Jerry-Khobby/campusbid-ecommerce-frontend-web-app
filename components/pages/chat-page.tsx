@@ -1,139 +1,334 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useQueries, useQuery } from "@tanstack/react-query"
+import type { Socket } from "socket.io-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useNotification } from "@/lib/notification-context"
 import { useUser } from "@/lib/user-context"
-import { mockVendors } from "@/lib/mock-data"
 import { OptimizedImage } from "@/components/optimized-image"
+import {
+  type Conversation,
+  type Message,
+  type PredefinedMessage,
+  type VendorSummary,
+  chatConversationsQueryKey,
+  chatMessagesQueryKey,
+  fetchConversations,
+  fetchMessages,
+  fetchPredefinedMessages,
+  fetchVendorSummary,
+  predefinedMessagesQueryKey,
+  vendorSummaryQueryKey,
+} from "@/lib/api/chat"
+import {
+  CHAT_EVENTS,
+  createChatSocket,
+  emitTyping,
+  joinConversation,
+  markConversationRead,
+  sendChatMessage,
+  type MessageReadEvent,
+  type TypingPayload,
+} from "@/lib/socket/chat-socket"
 
-interface Conversation {
-  id: number
-  vendorName: string
-  vendorImage: string
-  lastMessage: string
-  timestamp: string
-  unread: boolean
-  messages: Array<{
-    id: number
-    sender: "user" | "vendor"
-    text: string
-    time: string
-  }>
+const TYPING_DEBOUNCE_MS = 2000
+const PREDEFINED_ROLE = "customer"
+const MINUTE_MS = 60_000
+const HOUR_MS = 60 * MINUTE_MS
+const DAY_MS = 24 * HOUR_MS
+
+function formatMessageTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
-const mockConversations: Conversation[] = [
-  {
-    id: 1,
-    vendorName: "Campus Cafe",
-    vendorImage: "/coffee-and-pastry.jpg",
-    lastMessage: "Your order will be ready in 10 minutes",
-    timestamp: "2 min ago",
-    unread: true,
-    messages: [
-      { id: 1, sender: "user", text: "Hi, when will my order be ready?", time: "2:30 PM" },
-      { id: 2, sender: "vendor", text: "Your order will be ready in 10 minutes", time: "2:32 PM" },
-    ],
-  },
-  {
-    id: 2,
-    vendorName: "Tech Store",
-    vendorImage: "/wireless-earbuds.png",
-    lastMessage: "Thanks for your purchase!",
-    timestamp: "1 hour ago",
-    unread: false,
-    messages: [
-      { id: 1, sender: "user", text: "Do you have the wireless earbuds in stock?", time: "1:00 PM" },
-      { id: 2, sender: "vendor", text: "Yes, we have them in stock", time: "1:05 PM" },
-      { id: 3, sender: "user", text: "Great, I'll buy them now", time: "1:10 PM" },
-      { id: 4, sender: "vendor", text: "Thanks for your purchase!", time: "1:15 PM" },
-    ],
-  },
-  {
-    id: 3,
-    vendorName: "Quick Bites",
-    vendorImage: "/sandwich-combo.jpg",
-    lastMessage: "Order confirmed",
-    timestamp: "3 hours ago",
-    unread: false,
-    messages: [
-      { id: 1, sender: "user", text: "Can I customize my sandwich?", time: "11:00 AM" },
-      { id: 2, sender: "vendor", text: "Of course! What would you like?", time: "11:05 AM" },
-    ],
-  },
-]
-
-const getAllVendors = () => {
-  return mockVendors.map((vendor) => ({
-    id: vendor.id,
-    vendorName: vendor.name,
-    vendorImage: vendor.image,
-    lastMessage: "Start a conversation",
-    timestamp: "now",
-    unread: false,
-    messages: [],
-  }))
+function formatRelativeTime(iso: string): string {
+  const elapsedMs = Date.now() - new Date(iso).getTime()
+  if (elapsedMs < MINUTE_MS) return "just now"
+  if (elapsedMs < HOUR_MS) return `${Math.floor(elapsedMs / MINUTE_MS)}m ago`
+  if (elapsedMs < DAY_MS) return `${Math.floor(elapsedMs / HOUR_MS)}h ago`
+  return new Date(iso).toLocaleDateString()
 }
 
-const PREDEFINED_MESSAGES = [
-  "I need more of the items",
-  "I am satisfied with the product",
-  "Have your product been delivered",
-  "I'm okay with the product",
-  "Yes",
-  "No",
-]
+function sortMessagesChronologically(messages: Message[]): Message[] {
+  return [...messages].reverse()
+}
 
-export default function ChatPage() {
-  const [conversations, setConversations] = useState<Conversation[]>([...mockConversations, ...getAllVendors()])
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [isChatOpen, setIsChatOpen] = useState(false)
-  const { addNotification } = useNotification()
-  const { user } = useUser()
+interface ConversationListItemProps {
+  conversation: Conversation
+  vendor: VendorSummary | undefined
+  isSelected: boolean
+  onSelect: (conversation: Conversation) => void
+}
 
-  const filteredConversations = conversations.filter((conv) =>
-    conv.vendorName.toLowerCase().includes(searchQuery.toLowerCase()),
+function ConversationListItem({ conversation, vendor, isSelected, onSelect }: ConversationListItemProps) {
+  const vendorName = vendor?.profile.businessName ?? "Vendor"
+  const hasUnread = conversation.unreadCount.customer > 0
+  const preview = conversation.lastMessage?.text ?? "Start a conversation"
+  const timestamp = conversation.lastMessage ? formatRelativeTime(conversation.lastMessage.timestamp) : ""
+
+  return (
+    <button
+      onClick={() => onSelect(conversation)}
+      className={`w-full p-3 sm:p-4 border-b border-border text-left transition-colors hover:bg-muted ${
+        isSelected ? "bg-muted" : ""
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <OptimizedImage
+          src={vendor?.profile.logo ?? ""}
+          alt={vendorName}
+          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex-shrink-0"
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">{vendorName}</h3>
+            {hasUnread && <div className="w-2 h-2 bg-accent rounded-full flex-shrink-0" />}
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground truncate">{preview}</p>
+          <p className="text-xs text-muted-foreground mt-1">{timestamp}</p>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function MessageBubble({ message }: { message: Message }) {
+  const isOwnMessage = message.senderType === "customer"
+
+  return (
+    <div className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[75%] sm:max-w-xs px-3 sm:px-4 py-2 rounded-lg ${
+          isOwnMessage ? "bg-accent text-accent-foreground" : "bg-card text-foreground border border-border"
+        }`}
+      >
+        <p className="text-sm break-words">{message.content}</p>
+        <p className="text-xs opacity-70 mt-1">{formatMessageTime(message.createdAt)}</p>
+      </div>
+    </div>
+  )
+}
+
+interface PredefinedMessageGridProps {
+  messages: PredefinedMessage[]
+  onSelect: (message: PredefinedMessage) => void
+}
+
+function PredefinedMessageGrid({ messages, onSelect }: PredefinedMessageGridProps) {
+  if (messages.length === 0) return null
+
+  return (
+    <div className="p-3 sm:p-4 border-t border-border bg-card flex-shrink-0">
+      <p className="text-xs text-muted-foreground mb-3 text-center font-medium">💬 Select a quick reply to send:</p>
+      <div className="grid grid-cols-2 gap-2">
+        {messages.map((message) => (
+          <Button
+            key={message._id}
+            onClick={() => onSelect(message)}
+            variant="outline"
+            className="text-xs sm:text-sm h-auto py-3 px-3 whitespace-normal text-left justify-start hover:bg-accent hover:text-accent-foreground hover:border-accent transition-all active:scale-95 font-medium"
+          >
+            {message.text}
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Builds a vendorId -> profile lookup so the conversation list can show names/logos without a hook-per-row. */
+function useVendorSummaries(conversations: Conversation[]): Map<string, VendorSummary> {
+  const vendorIds = useMemo(
+    () => Array.from(new Set(conversations.map((conversation) => conversation.participants.vendorId))),
+    [conversations],
   )
 
-  const handleSendMessage = (messageText: string) => {
-    if (!messageText.trim() || !selectedConversation || !user) return
+  const vendorQueries = useQueries({
+    queries: vendorIds.map((vendorId) => ({
+      queryKey: vendorSummaryQueryKey(vendorId),
+      queryFn: () => fetchVendorSummary(vendorId),
+      staleTime: 5 * MINUTE_MS,
+    })),
+  })
 
-    const updatedConversations = conversations.map((conv) => {
-      if (conv.id === selectedConversation.id) {
-        return {
-          ...conv,
-          messages: [
-            ...conv.messages,
-            {
-              id: conv.messages.length + 1,
-              sender: "user" as const,
-              text: messageText,
-              time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            },
-          ],
-          lastMessage: messageText,
-          timestamp: "now",
-          unread: false,
-        }
-      }
-      return conv
+  return useMemo(() => {
+    const summaries = new Map<string, VendorSummary>()
+    vendorIds.forEach((vendorId, index) => {
+      const summary = vendorQueries[index]?.data
+      if (summary) summaries.set(vendorId, summary)
     })
+    return summaries
+  }, [vendorIds, vendorQueries])
+}
 
-    setConversations(updatedConversations)
-    setSelectedConversation(updatedConversations.find((c) => c.id === selectedConversation.id) || null)
-    addNotification("Message sent", "success")
+export default function ChatPage() {
+  const { user } = useUser()
+  const { addNotification } = useNotification()
+
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [messageInput, setMessageInput] = useState("")
+  const [isVendorTyping, setIsVendorTyping] = useState(false)
+
+  const socketRef = useRef<Socket | null>(null)
+  const selectedConversationIdRef = useRef<string | null>(null)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isTypingRef = useRef(false)
+
+  const conversationsQuery = useQuery({ queryKey: chatConversationsQueryKey, queryFn: fetchConversations })
+  const conversations = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data])
+  const vendorSummaries = useVendorSummaries(conversations)
+
+  const messagesQuery = useQuery({
+    queryKey: chatMessagesQueryKey(selectedConversationId ?? ""),
+    queryFn: () => fetchMessages(selectedConversationId as string),
+    enabled: selectedConversationId !== null,
+  })
+
+  const predefinedQuery = useQuery({
+    queryKey: predefinedMessagesQueryKey(PREDEFINED_ROLE),
+    queryFn: () => fetchPredefinedMessages(PREDEFINED_ROLE),
+  })
+
+  useReportQueryError(conversationsQuery.isError, "Failed to load conversations")
+  useReportQueryError(messagesQuery.isError, "Failed to load messages")
+
+  const selectedConversation = useMemo(
+    () => conversations.find((conversation) => conversation._id === selectedConversationId) ?? null,
+    [conversations, selectedConversationId],
+  )
+
+  const filteredConversations = useMemo(() => {
+    const query = searchQuery.toLowerCase()
+    return conversations.filter((conversation) => {
+      const vendorName = vendorSummaries.get(conversation.participants.vendorId)?.profile.businessName ?? ""
+      return vendorName.toLowerCase().includes(query)
+    })
+  }, [conversations, vendorSummaries, searchQuery])
+
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId
+  }, [selectedConversationId])
+
+  // Connect once on mount; the same socket is reused across conversation switches and re-renders.
+  useEffect(() => {
+    const socket = createChatSocket()
+    socketRef.current = socket
+
+    const handleMessageReceived = (message: Message) => {
+      if (message.conversationId !== selectedConversationIdRef.current) return
+      setMessages((previous) => [...previous, message])
+    }
+    const handleMessageRead = (_event: MessageReadEvent) => {
+      // Read receipts aren't surfaced in this UI yet; acknowledging the event keeps the listener list explicit.
+    }
+    const handleTypingIndicator = (payload: TypingPayload) => {
+      if (payload.conversationId !== selectedConversationIdRef.current) return
+      setIsVendorTyping(payload.isTyping)
+    }
+
+    socket.on(CHAT_EVENTS.messageReceived, handleMessageReceived)
+    socket.on(CHAT_EVENTS.messageRead, handleMessageRead)
+    socket.on(CHAT_EVENTS.typingIndicator, handleTypingIndicator)
+    socket.connect()
+
+    return () => {
+      socket.off(CHAT_EVENTS.messageReceived, handleMessageReceived)
+      socket.off(CHAT_EVENTS.messageRead, handleMessageRead)
+      socket.off(CHAT_EVENTS.typingIndicator, handleTypingIndicator)
+      socket.disconnect()
+      socketRef.current = null
+    }
+  }, [])
+
+  // Join the selected conversation's room and mark it read whenever the selection changes.
+  useEffect(() => {
+    const socket = socketRef.current
+    if (!socket || !selectedConversationId) return
+
+    const joinAndMarkRead = () => {
+      joinConversation(socket, selectedConversationId)
+      markConversationRead(socket, selectedConversationId)
+    }
+
+    if (socket.connected) joinAndMarkRead()
+    else socket.once("connect", joinAndMarkRead)
+
+    return () => {
+      socket.off("connect", joinAndMarkRead)
+    }
+  }, [selectedConversationId])
+
+  useEffect(() => {
+    setMessages([])
+    setIsVendorTyping(false)
+  }, [selectedConversationId])
+
+  useEffect(() => {
+    if (messagesQuery.data) setMessages(sortMessagesChronologically(messagesQuery.data))
+  }, [messagesQuery.data])
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    }
+  }, [])
+
+  const stopTyping = (conversationId: string, userId: string) => {
+    isTypingRef.current = false
+    const socket = socketRef.current
+    if (socket) emitTyping(socket, { conversationId, userId, isTyping: false })
   }
 
-  const handleSelectConversation = (conv: Conversation) => {
-    setSelectedConversation(conv)
+  const handleMessageInputChange = (value: string) => {
+    setMessageInput(value)
+    const socket = socketRef.current
+    if (!socket || !selectedConversationId || !user) return
+
+    if (!isTypingRef.current) {
+      isTypingRef.current = true
+      emitTyping(socket, { conversationId: selectedConversationId, userId: user._id, isTyping: true })
+    }
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    typingTimeoutRef.current = setTimeout(() => stopTyping(selectedConversationId, user._id), TYPING_DEBOUNCE_MS)
+  }
+
+  const sendMessage = (content: string, messageType: "text" | "predefined", predefinedMessageId?: string) => {
+    const socket = socketRef.current
+    if (!socket || !selectedConversationId || !user || !content.trim()) return
+
+    sendChatMessage(socket, {
+      conversationId: selectedConversationId,
+      senderId: user._id,
+      senderType: "customer",
+      messageType,
+      content,
+      predefinedMessageId,
+    })
+  }
+
+  const handleSendTextMessage = () => {
+    sendMessage(messageInput, "text")
+    setMessageInput("")
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+    if (selectedConversationId && user) stopTyping(selectedConversationId, user._id)
+  }
+
+  const handleSelectPredefinedMessage = (predefined: PredefinedMessage) => {
+    sendMessage(predefined.text, "predefined", predefined._id)
+  }
+
+  const handleSelectConversation = (conversation: Conversation) => {
+    setSelectedConversationId(conversation._id)
     setIsChatOpen(true)
   }
 
-  const handleBackToList = () => {
-    setIsChatOpen(false)
-  }
+  const handleBackToList = () => setIsChatOpen(false)
 
   if (!user) {
     return (
@@ -145,10 +340,13 @@ export default function ChatPage() {
     )
   }
 
+  const selectedVendor = selectedConversation
+    ? vendorSummaries.get(selectedConversation.participants.vendorId)
+    : undefined
+
   return (
     <main className="w-full h-full max-w-7xl mx-auto px-2 sm:px-4 py-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-8rem)] md:h-[calc(100vh-9rem)]">
-        {/* Conversations List - Hide on mobile when chat is open */}
         <div
           className={`${isChatOpen ? "hidden md:block" : "block"} md:col-span-1 border border-border rounded-lg flex flex-col overflow-hidden bg-card`}
         >
@@ -167,98 +365,74 @@ export default function ChatPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {filteredConversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => handleSelectConversation(conv)}
-                className={`w-full p-3 sm:p-4 border-b border-border text-left transition-colors hover:bg-muted ${
-                  selectedConversation?.id === conv.id ? "bg-muted" : ""
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <OptimizedImage
-                    src={conv.vendorImage}
-                    alt={conv.vendorName}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">{conv.vendorName}</h3>
-                      {conv.unread && <div className="w-2 h-2 bg-accent rounded-full flex-shrink-0" />}
-                    </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground truncate">{conv.lastMessage}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{conv.timestamp}</p>
-                  </div>
-                </div>
-              </button>
+            {conversationsQuery.isLoading && (
+              <p className="text-sm text-muted-foreground text-center py-6">Loading conversations…</p>
+            )}
+            {!conversationsQuery.isLoading && filteredConversations.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">No conversations yet</p>
+            )}
+            {filteredConversations.map((conversation) => (
+              <ConversationListItem
+                key={conversation._id}
+                conversation={conversation}
+                vendor={vendorSummaries.get(conversation.participants.vendorId)}
+                isSelected={selectedConversationId === conversation._id}
+                onSelect={handleSelectConversation}
+              />
             ))}
           </div>
         </div>
 
-        {/* Chat Area - Show on mobile when chat is open, always show on desktop */}
         {selectedConversation ? (
           <div
             className={`${!isChatOpen ? "hidden md:flex" : "flex"} md:col-span-2 border border-border rounded-lg flex-col overflow-hidden bg-card`}
           >
-            {/* Header */}
             <div className="p-3 sm:p-4 border-b border-border flex items-center gap-3 flex-shrink-0">
               <button onClick={handleBackToList} className="md:hidden p-2 hover:bg-muted rounded-lg transition-colors">
                 <span className="text-xl">←</span>
               </button>
               <OptimizedImage
-                src={selectedConversation.vendorImage}
-                alt={selectedConversation.vendorName}
+                src={selectedVendor?.profile.logo ?? ""}
+                alt={selectedVendor?.profile.businessName ?? "Vendor"}
                 className="w-10 h-10 rounded-full"
               />
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
-                  {selectedConversation.vendorName}
+                  {selectedVendor?.profile.businessName ?? "Vendor"}
                 </h3>
-                <p className="text-xs text-muted-foreground">Active now</p>
+                <p className="text-xs text-muted-foreground">{isVendorTyping ? "typing…" : "Active now"}</p>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-muted/20">
-              {selectedConversation.messages.length === 0 ? (
+              {messagesQuery.isLoading && (
+                <p className="text-center text-muted-foreground text-sm">Loading messages…</p>
+              )}
+              {!messagesQuery.isLoading && messages.length === 0 && (
                 <div className="flex items-center justify-center h-full">
                   <p className="text-muted-foreground text-sm">No messages yet. Start the conversation!</p>
                 </div>
-              ) : (
-                selectedConversation.messages.map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[75%] sm:max-w-xs px-3 sm:px-4 py-2 rounded-lg ${
-                        msg.sender === "user"
-                          ? "bg-accent text-accent-foreground"
-                          : "bg-card text-foreground border border-border"
-                      }`}
-                    >
-                      <p className="text-sm break-words">{msg.text}</p>
-                      <p className="text-xs opacity-70 mt-1">{msg.time}</p>
-                    </div>
-                  </div>
-                ))
               )}
+              {messages.map((message) => (
+                <MessageBubble key={message._id} message={message} />
+              ))}
             </div>
 
-            {/* Predefined Messages */}
-            <div className="p-3 sm:p-4 border-t border-border bg-card flex-shrink-0">
-              <p className="text-xs text-muted-foreground mb-3 text-center font-medium">
-                💬 Select a quick reply to send:
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {PREDEFINED_MESSAGES.map((message, index) => (
-                  <Button
-                    key={index}
-                    onClick={() => handleSendMessage(message)}
-                    variant="outline"
-                    className="text-xs sm:text-sm h-auto py-3 px-3 whitespace-normal text-left justify-start hover:bg-accent hover:text-accent-foreground hover:border-accent transition-all active:scale-95 font-medium"
-                  >
-                    {message}
-                  </Button>
-                ))}
-              </div>
+            <div className="p-3 sm:p-4 border-t border-border bg-card flex-shrink-0 flex gap-2">
+              <Input
+                type="text"
+                placeholder="Type a message..."
+                value={messageInput}
+                onChange={(e) => handleMessageInputChange(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendTextMessage()}
+                className="text-sm"
+              />
+              <Button onClick={handleSendTextMessage} disabled={!messageInput.trim()}>
+                Send
+              </Button>
             </div>
+
+            <PredefinedMessageGrid messages={predefinedQuery.data ?? []} onSelect={handleSelectPredefinedMessage} />
           </div>
         ) : (
           <div className="hidden md:flex md:col-span-2 border border-border rounded-lg items-center justify-center bg-card">
@@ -271,4 +445,13 @@ export default function ChatPage() {
       </div>
     </main>
   )
+}
+
+/** Toasts a query's error state exactly once per failure, instead of leaving it silent or re-toasting on every render. */
+function useReportQueryError(isError: boolean, message: string): void {
+  const { addNotification } = useNotification()
+
+  useEffect(() => {
+    if (isError) addNotification(message, "error")
+  }, [isError, message, addNotification])
 }

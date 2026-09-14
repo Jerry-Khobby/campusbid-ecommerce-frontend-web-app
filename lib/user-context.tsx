@@ -1,103 +1,122 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
+import { fetchCurrentUser, loginUser, logoutUser, registerUser } from "./api/auth"
+import { getAccessToken } from "./api/token-storage"
+import type { SafeUser } from "./api/types"
 
-export interface User {
-  id: string
-  name: string
-  email: string
-  phone: string
-  avatar: string
-  profileImage?: string
-  joinDate: string
-  userType: "buyer" | "vendor"
-  stats: {
-    orders: number
-    bidsWon: number
-    rating: number
-  }
-  savedItems: number[]
-}
+export type User = SafeUser
+
+const SAVED_ITEMS_STORAGE_KEY = "campusbid.savedItemIds"
 
 interface UserContextType {
   user: User | null
-  setUser: React.Dispatch<React.SetStateAction<User | null>>
   isLoggedIn: boolean
-  login: (email: string, password: string, name: string) => void
-  logout: () => void
-  updateProfile: (updates: Partial<User>) => void
-  toggleSaveItem: (itemId: number) => void
-  updateProfileImage: (imageUrl: string) => void
+  isLoading: boolean
+  login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string) => Promise<void>
+  logout: () => Promise<void>
+  refetchUser: () => Promise<void>
+  // Client-only "wishlist" — the backend has no endpoint to read/write
+  // savedItems (confirmed in docs/users.md: the field exists on the User
+  // schema but nothing serves/mutates it), so this is intentionally local
+  // state, not synced to the account. Persisted to localStorage so it
+  // survives a reload, but it's per-browser, not per-account.
+  savedItemIds: string[]
+  toggleSavedItem: (productId: string) => void
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
-const defaultUser: User = {
-  id: "user-001",
-  name: "Alex Student",
-  email: "alex@university.edu",
-  phone: "+1 (555) 123-4567",
-  avatar: "AS",
-  profileImage: undefined,
-  joinDate: "January 2024",
-  userType: "buyer",
-  stats: {
-    orders: 12,
-    bidsWon: 8,
-    rating: 4.8,
-  },
-  savedItems: [],
+export function getDisplayName(user: User | null): string {
+  if (!user) return ""
+  const name = [user.profile.firstName, user.profile.lastName].filter(Boolean).join(" ")
+  return name || user.email
+}
+
+export function getInitials(user: User | null): string {
+  if (!user) return ""
+  const name = getDisplayName(user)
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase()
+}
+
+function readSavedItemIds(): string[] {
+  if (typeof window === "undefined") return []
+  try {
+    const raw = window.localStorage.getItem(SAVED_ITEMS_STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as string[]) : []
+  } catch {
+    return []
+  }
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [savedItemIds, setSavedItemIds] = useState<string[]>([])
 
-  const login = (email: string, password: string, name: string) => {
-    if (email && password && name) {
-      setUser({ ...defaultUser, email, name })
-      setIsLoggedIn(true)
+  const refetchUser = async () => {
+    if (!getAccessToken()) {
+      setUser(null)
+      return
+    }
+    try {
+      const fetchedUser = await fetchCurrentUser()
+      setUser(fetchedUser)
+    } catch {
+      setUser(null)
     }
   }
 
-  const logout = () => {
+  useEffect(() => {
+    refetchUser().finally(() => setIsLoading(false))
+    setSavedItemIds(readSavedItemIds())
+  }, [])
+
+  const login = async (email: string, password: string) => {
+    const result = await loginUser({ email, password })
+    setUser(result.user)
+  }
+
+  const register = async (email: string, password: string) => {
+    const result = await registerUser({ email, password })
+    setUser(result.user)
+  }
+
+  const logout = async () => {
+    await logoutUser()
     setUser(null)
-    setIsLoggedIn(false)
   }
 
-  const updateProfile = (updates: Partial<User>) => {
-    if (user) {
-      setUser({ ...user, ...updates })
-    }
-  }
-
-  const toggleSaveItem = (itemId: number) => {
-    if (user) {
-      const savedItems = user.savedItems.includes(itemId)
-        ? user.savedItems.filter((id) => id !== itemId)
-        : [...user.savedItems, itemId]
-      setUser({ ...user, savedItems })
-    }
-  }
-
-  const updateProfileImage = (imageUrl: string) => {
-    if (user) {
-      setUser({ ...user, profileImage: imageUrl })
-    }
+  const toggleSavedItem = (productId: string) => {
+    setSavedItemIds((previous) => {
+      const next = previous.includes(productId)
+        ? previous.filter((id) => id !== productId)
+        : [...previous, productId]
+      window.localStorage.setItem(SAVED_ITEMS_STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
   }
 
   return (
     <UserContext.Provider
       value={{
         user,
-        setUser,
-        isLoggedIn,
+        isLoggedIn: user !== null,
+        isLoading,
         login,
+        register,
         logout,
-        updateProfile,
-        toggleSaveItem,
-        updateProfileImage,
+        refetchUser,
+        savedItemIds,
+        toggleSavedItem,
       }}
     >
       {children}

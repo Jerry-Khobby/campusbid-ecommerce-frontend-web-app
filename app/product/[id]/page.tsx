@@ -6,5 +6,5 @@ export default async function ProductDetail({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <ProductDetailPage itemId={Number.parseInt(id)} />;
+  return <ProductDetailPage productId={id} />;
 }
