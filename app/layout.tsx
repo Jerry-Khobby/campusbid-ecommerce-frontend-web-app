@@ -10,8 +10,12 @@ import NotificationToast from "@/components/notification-toast";
 import BottomNavigation from "@/components/bottom-navigation";
 import MainContent from "@/components/main-content";
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+// Assigning to a const is required for Next's font-loader compiler plugin to
+// pick this up; the objects themselves aren't used directly. This self-hosts
+// the "Geist"/"Geist Mono" families that globals.css references by name in
+// --font-sans/--font-mono.
+const geistSans = Geist({ subsets: ["latin"] });
+const geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "CampusBid - Campus Marketplace",

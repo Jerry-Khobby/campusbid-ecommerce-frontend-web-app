@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useCart } from "@/lib/cart-context"
 import { useRouter } from "next/navigation"
-
-type CheckoutPageProps = {}
+import { DELIVERY_FEE } from "@/lib/constants"
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -68,13 +67,13 @@ export default function CheckoutPage() {
           <div className="bg-muted p-4 rounded-lg mb-6 text-left">
             <p className="text-sm text-muted-foreground mb-2">Order Number</p>
             <p className="font-bold text-foreground text-lg">
-              ORD-{Math.random().toString(36).substr(2, 9).toUpperCase()}
+              ORD-{Math.random().toString(36).slice(2, 11).toUpperCase()}
             </p>
           </div>
 
           <div className="bg-muted p-4 rounded-lg mb-6 text-left">
             <p className="text-sm text-muted-foreground mb-2">Total Amount</p>
-            <p className="font-bold text-accent text-lg">${(total + 2).toFixed(2)}</p>
+            <p className="font-bold text-accent text-lg">${(total + DELIVERY_FEE).toFixed(2)}</p>
           </div>
 
           <Button
@@ -101,14 +100,11 @@ export default function CheckoutPage() {
       </div>
 
       {/* Progress Indicator */}
+      {/* Only "address"/"payment" reach this point — "confirmation" returns its own page above. */}
       <div className="flex gap-2 mb-8">
-        <div
-          className={`flex-1 h-1 rounded-full ${step === "address" || step === "payment" || step === "confirmation" ? "bg-accent" : "bg-muted"}`}
-        />
-        <div
-          className={`flex-1 h-1 rounded-full ${step === "payment" || step === "confirmation" ? "bg-accent" : "bg-muted"}`}
-        />
-        <div className={`flex-1 h-1 rounded-full ${step === "confirmation" ? "bg-accent" : "bg-muted"}`} />
+        <div className="flex-1 h-1 rounded-full bg-accent" />
+        <div className={`flex-1 h-1 rounded-full ${step === "payment" ? "bg-accent" : "bg-muted"}`} />
+        <div className="flex-1 h-1 rounded-full bg-muted" />
       </div>
 
       {/* Address Step */}
@@ -237,7 +233,7 @@ export default function CheckoutPage() {
           ))}
           <div className="border-t border-border pt-3 flex justify-between font-bold text-foreground">
             <span>Total</span>
-            <span className="text-accent">${(total + 2).toFixed(2)}</span>
+            <span className="text-accent">${(total + DELIVERY_FEE).toFixed(2)}</span>
           </div>
         </div>
       </Card>

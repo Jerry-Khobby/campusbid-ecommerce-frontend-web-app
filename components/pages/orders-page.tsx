@@ -1,59 +1,38 @@
 "use client"
 
+import type React from "react"
 import { useState } from "react"
 import { CheckCircle2, Clock, Truck, Package, Phone, MapPin, AlertCircle } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { useOrders } from "@/lib/orders-context"
+import { useOrders, type OrderItem } from "@/lib/orders-context"
+
+const ORDER_STATUS_CONFIG: Record<OrderItem["status"], { icon: React.ReactNode; label: string; cardClassName: string }> = {
+  ordered: {
+    icon: <Package size={20} className="text-muted-foreground" />,
+    label: "Ordered",
+    cardClassName: "bg-muted",
+  },
+  prepared: {
+    icon: <Clock size={20} className="text-muted-foreground" />,
+    label: "Prepared",
+    cardClassName: "bg-muted",
+  },
+  "out-for-delivery": {
+    icon: <Truck size={20} className="text-accent" />,
+    label: "Out for Delivery",
+    cardClassName: "bg-accent/10",
+  },
+  delivered: {
+    icon: <CheckCircle2 size={20} className="text-green-500" />,
+    label: "Delivered",
+    cardClassName: "bg-green-50",
+  },
+}
 
 export default function OrdersPage() {
   const { orders, confirmDelivery } = useOrders()
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "ordered":
-        return <Package size={20} className="text-muted-foreground" />
-      case "prepared":
-        return <Clock size={20} className="text-muted-foreground" />
-      case "out-for-delivery":
-        return <Truck size={20} className="text-accent" />
-      case "delivered":
-        return <CheckCircle2 size={20} className="text-green-500" />
-      default:
-        return null
-    }
-  }
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "ordered":
-        return "Ordered"
-      case "prepared":
-        return "Prepared"
-      case "out-for-delivery":
-        return "Out for Delivery"
-      case "delivered":
-        return "Delivered"
-      default:
-        return ""
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "ordered":
-        return "bg-muted"
-      case "prepared":
-        return "bg-muted"
-      case "out-for-delivery":
-        return "bg-accent/10"
-      case "delivered":
-        return "bg-green-50"
-      default:
-        return "bg-muted"
-    }
-  }
 
   return (
     <main className="w-full max-w-2xl mx-auto px-4 py-6">
@@ -68,7 +47,7 @@ export default function OrdersPage() {
         {orders.map((order) => (
           <Card
             key={order.id}
-            className={`p-4 hover:shadow-lg transition-shadow cursor-pointer ${getStatusColor(order.status)}`}
+            className={`p-4 hover:shadow-lg transition-shadow cursor-pointer ${ORDER_STATUS_CONFIG[order.status].cardClassName}`}
             onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
           >
             {/* Order Header */}
@@ -86,8 +65,8 @@ export default function OrdersPage() {
 
             {/* Status Timeline */}
             <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border">
-              {getStatusIcon(order.status)}
-              <span className="text-sm font-medium text-foreground">{getStatusLabel(order.status)}</span>
+              {ORDER_STATUS_CONFIG[order.status].icon}
+              <span className="text-sm font-medium text-foreground">{ORDER_STATUS_CONFIG[order.status].label}</span>
               {order.paymentStatus === "held" && (
                 <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-full ml-auto">Payment Held</span>
               )}

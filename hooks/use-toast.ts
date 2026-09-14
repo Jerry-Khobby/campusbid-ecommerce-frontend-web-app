@@ -1,6 +1,5 @@
 'use client'
 
-// Inspired by react-hot-toast library
 import * as React from 'react'
 
 import type { ToastActionElement, ToastProps } from '@/components/ui/toast'
@@ -22,11 +21,11 @@ const actionTypes = {
   REMOVE_TOAST: 'REMOVE_TOAST',
 } as const
 
-let count = 0
+let toastIdCounter = 0
 
-function genId() {
-  count = (count + 1) % Number.MAX_SAFE_INTEGER
-  return count.toString()
+function generateToastId() {
+  toastIdCounter = (toastIdCounter + 1) % Number.MAX_SAFE_INTEGER
+  return toastIdCounter.toString()
 }
 
 type ActionType = typeof actionTypes
@@ -90,8 +89,8 @@ export const reducer = (state: State, action: Action): State => {
     case 'DISMISS_TOAST': {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
+      // Scheduling the removal timeout here (rather than in a separate action) keeps
+      // the delayed removal in sync with the state transition that triggers it.
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -139,8 +138,8 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, 'id'>
 
-function toast({ ...props }: Toast) {
-  const id = genId()
+function toast(props: Toast) {
+  const id = generateToastId()
 
   const update = (props: ToasterToast) =>
     dispatch({
@@ -172,6 +171,8 @@ function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
 
   React.useEffect(() => {
+    // setState is referentially stable, so this subscribes once on mount and
+    // unsubscribes on unmount rather than churning on every state update.
     listeners.push(setState)
     return () => {
       const index = listeners.indexOf(setState)
@@ -179,7 +180,7 @@ function useToast() {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, [])
 
   return {
     ...state,

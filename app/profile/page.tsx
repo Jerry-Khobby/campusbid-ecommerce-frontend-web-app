@@ -1,22 +1,10 @@
 "use client"
 
 import ProfilePage from "@/components/pages/profile-page"
-import { useUser } from "@/lib/user-context"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-import { useNotification } from "@/lib/notification-context"
+import { useRequireAuth } from "@/hooks/use-require-auth"
 
 export default function Profile() {
-  const { isLoggedIn } = useUser()
-  const router = useRouter()
-  const { addNotification } = useNotification()
-
-  useEffect(() => {
-    if (!isLoggedIn) {
-      addNotification("Please log in to view your profile", "info")
-      router.push("/login")
-    }
-  }, [isLoggedIn, router, addNotification])
+  const isLoggedIn = useRequireAuth("Please log in to view your profile")
 
   if (!isLoggedIn) {
     return null

@@ -1,5 +1,7 @@
 "use client"
 
+const CHAT_SKELETON_MESSAGE_COUNT = 5
+
 export function SkeletonLoader() {
   return (
     <div className="overflow-hidden rounded-lg bg-muted animate-pulse">
@@ -49,7 +51,7 @@ export function FlashSaleCardSkeleton() {
 export function ChatSkeleton() {
   return (
     <div className="space-y-4">
-      {[...Array(5)].map((_, i) => (
+      {[...Array(CHAT_SKELETON_MESSAGE_COUNT)].map((_, i) => (
         <div key={i} className={`flex ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
           <div className="h-10 bg-muted-foreground/20 rounded-lg w-2/3 animate-pulse" />
         </div>

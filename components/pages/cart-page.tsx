@@ -5,8 +5,8 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/cart-context"
 import { useRouter } from "next/navigation"
-
-type CartPageProps = {}
+import { DELIVERY_FEE } from "@/lib/constants"
+import { OptimizedImage } from "@/components/optimized-image"
 
 export default function CartPage() {
   const router = useRouter()
@@ -43,7 +43,7 @@ export default function CartPage() {
           <Card key={item.id} className="p-4 flex gap-4">
             {/* Image */}
             <div className="w-20 h-20 flex-shrink-0 bg-muted rounded-lg overflow-hidden">
-              <img src={item.image || "/placeholder.svg"} alt={item.name} className="w-full h-full object-cover" />
+              <OptimizedImage src={item.image} alt={item.name} className="w-full h-full" />
             </div>
 
             {/* Content */}
@@ -92,11 +92,11 @@ export default function CartPage() {
           </div>
           <div className="flex justify-between text-foreground">
             <span>Delivery Fee</span>
-            <span>$2.00</span>
+            <span>${DELIVERY_FEE.toFixed(2)}</span>
           </div>
           <div className="border-t border-border pt-3 flex justify-between font-bold text-lg text-foreground">
             <span>Total</span>
-            <span className="text-accent">${(total + 2).toFixed(2)}</span>
+            <span className="text-accent">${(total + DELIVERY_FEE).toFixed(2)}</span>
           </div>
         </div>
 

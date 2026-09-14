@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useNotification } from "@/lib/notification-context"
 import { useUser } from "@/lib/user-context"
-import { useRouter } from "next/navigation" // Fixed router import to use next/navigation for App Router
+import { useRequireLoginAction } from "@/hooks/use-require-login-action"
 import { mockFlashSales } from "@/lib/mock-data"
 import { ButtonWithLoader } from "@/components/button-with-loader"
+import { OptimizedImage } from "@/components/optimized-image"
 
 interface FlashItem {
   id: number
@@ -33,8 +34,8 @@ export default function FlashSalesPage() {
   const [showBidModal, setShowBidModal] = useState(false)
   const [isBidLoading, setIsBidLoading] = useState(false)
   const { addNotification } = useNotification()
-  const { isLoggedIn, user } = useUser()
-  const router = useRouter()
+  const { user } = useUser()
+  const requireLogin = useRequireLoginAction()
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -62,14 +63,11 @@ export default function FlashSalesPage() {
   }, [items])
 
   const handleOpenBidModal = (item: FlashItem) => {
-    if (!isLoggedIn) {
-      addNotification("Please log in to place a bid", "info")
-      router.push("/login")
-      return
-    }
-    setSelectedItem(item)
-    setBidAmount(item.currentBid.toString())
-    setShowBidModal(true)
+    requireLogin("Please log in to place a bid", () => {
+      setSelectedItem(item)
+      setBidAmount(item.currentBid.toString())
+      setShowBidModal(true)
+    })
   }
 
   const handlePlaceBid = () => {
@@ -122,7 +120,7 @@ export default function FlashSalesPage() {
           <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
             {/* Image */}
             <div className="aspect-square bg-muted overflow-hidden">
-              <img src={item.image || "/placeholder.svg"} alt={item.name} className="w-full h-full object-cover" />
+              <OptimizedImage src={item.image} alt={item.name} className="w-full h-full" />
             </div>
 
             {/* Content */}
@@ -177,10 +175,10 @@ export default function FlashSalesPage() {
               {/* Item Info */}
               <div className="mb-6 pb-6 border-b">
                 <div className="flex gap-4 mb-4">
-                  <img
-                    src={selectedItem.image || "/placeholder.svg"}
+                  <OptimizedImage
+                    src={selectedItem.image}
                     alt={selectedItem.name}
-                    className="w-20 h-20 object-cover rounded"
+                    className="w-20 h-20 rounded flex-shrink-0"
                   />
                   <div className="flex-1">
                     <h3 className="font-semibold text-foreground mb-1">{selectedItem.name}</h3>

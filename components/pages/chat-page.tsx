@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { useNotification } from "@/lib/notification-context"
 import { useUser } from "@/lib/user-context"
 import { mockVendors } from "@/lib/mock-data"
+import { OptimizedImage } from "@/components/optimized-image"
 
 interface Conversation {
   id: number
@@ -175,10 +176,10 @@ export default function ChatPage() {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <img
-                    src={conv.vendorImage || "/placeholder.svg"}
+                  <OptimizedImage
+                    src={conv.vendorImage}
                     alt={conv.vendorName}
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover flex-shrink-0"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
@@ -204,10 +205,10 @@ export default function ChatPage() {
               <button onClick={handleBackToList} className="md:hidden p-2 hover:bg-muted rounded-lg transition-colors">
                 <span className="text-xl">←</span>
               </button>
-              <img
-                src={selectedConversation.vendorImage || "/placeholder.svg"}
+              <OptimizedImage
+                src={selectedConversation.vendorImage}
                 alt={selectedConversation.vendorName}
-                className="w-10 h-10 rounded-full object-cover"
+                className="w-10 h-10 rounded-full"
               />
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">

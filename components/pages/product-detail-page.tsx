@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
 import { ArrowLeft, MapPin, Star, Heart, MessageSquare, Plus } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useCart } from "@/lib/cart-context"
 import { useUser } from "@/lib/user-context"
 import { useNotification } from "@/lib/notification-context"
+import { useRequireLoginAction } from "@/hooks/use-require-login-action"
 import { mockItems, mockVendors } from "@/lib/mock-data"
 import { OptimizedImage } from "@/components/optimized-image"
 import { ButtonWithLoader } from "@/components/button-with-loader"
@@ -23,9 +23,9 @@ export default function ProductDetailPage({ itemId }: ProductDetailPageProps) {
   const vendorItems = mockItems.filter((i) => i.vendor === item?.vendor && i.id !== itemId)
 
   const { addItem } = useCart()
-  const { user, toggleSaveItem, isLoggedIn } = useUser()
+  const { user, toggleSaveItem } = useUser()
   const { addNotification } = useNotification()
-  const [isAddingToCart, setIsAddingToCart] = useState(false)
+  const requireLogin = useRequireLoginAction()
 
   if (!item || !vendor) {
     return (
@@ -36,38 +36,28 @@ export default function ProductDetailPage({ itemId }: ProductDetailPageProps) {
   }
 
   const handleAddToCart = () => {
-    setIsAddingToCart(true)
-    setTimeout(() => {
-      addItem({
-        id: item.id,
-        name: item.name,
-        vendor: item.vendor,
-        price: item.price,
-        image: item.image,
-      })
-      addNotification(`${item.name} added to cart`, "success")
-      setIsAddingToCart(false)
-    }, 1000)
+    addItem({
+      id: item.id,
+      name: item.name,
+      vendor: item.vendor,
+      price: item.price,
+      image: item.image,
+    })
+    addNotification(`${item.name} added to cart`, "success")
   }
 
   const handleSaveItem = () => {
-    if (!user) {
-      addNotification("Please log in to save items", "info")
-      router.push("/login")
-      return
-    }
-    toggleSaveItem(item.id)
-    const isSaved = user.savedItems.includes(item.id)
-    addNotification(isSaved ? "Item removed from saved" : "Item saved", "info")
+    requireLogin("Please log in to save items", () => {
+      toggleSaveItem(item.id)
+      const isSaved = user?.savedItems.includes(item.id)
+      addNotification(isSaved ? "Item removed from saved" : "Item saved", "info")
+    })
   }
 
   const handleChatWithVendor = () => {
-    if (!isLoggedIn) {
-      addNotification("Please log in to chat with vendors", "info")
-      router.push("/login")
-      return
-    }
-    router.push("/chat")
+    requireLogin("Please log in to chat with vendors", () => {
+      router.push("/chat")
+    })
   }
 
   const isSaved = user?.savedItems.includes(item.id)

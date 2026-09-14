@@ -1,11 +1,11 @@
 "use client"
 
-import { useNotification } from "@/lib/notification-context"
+import { useNotification, type Notification } from "@/lib/notification-context"
 
 export default function NotificationToast() {
   const { notifications, removeNotification } = useNotification()
 
-  const getIcon = (type: string) => {
+  const getIcon = (type: Notification["type"]) => {
     switch (type) {
       case "success":
         return <span className="text-xl">✅</span>

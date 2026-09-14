@@ -6,6 +6,8 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 
+const DEFAULT_LOADING_DURATION_MS = 1500
+
 interface ButtonWithLoaderProps {
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void | Promise<void>
   children: React.ReactNode
@@ -21,7 +23,7 @@ export function ButtonWithLoader({
   className,
   variant = "default",
   disabled = false,
-  loadingDuration = 1500,
+  loadingDuration = DEFAULT_LOADING_DURATION_MS,
 }: ButtonWithLoaderProps) {
   const [isLoading, setIsLoading] = useState(false)
 

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { useUser } from "@/lib/user-context"
 import { useNotification } from "@/lib/notification-context"
 import { mockItems } from "@/lib/mock-data"
+import { OptimizedImage } from "@/components/optimized-image"
 
 export default function ProfilePage() {
   const { user, logout, updateProfile, toggleSaveItem, updateProfileImage } = useUser()
@@ -30,6 +31,9 @@ export default function ProfilePage() {
         const imageUrl = event.target?.result as string
         updateProfileImage(imageUrl)
         addNotification("Profile picture updated successfully", "success")
+      }
+      reader.onerror = () => {
+        addNotification("Failed to read the selected image, please try again", "error")
       }
       reader.readAsDataURL(file)
     }
@@ -82,11 +86,7 @@ export default function ProfilePage() {
           <div className="relative flex-shrink-0">
             <div className="w-20 h-20 md:w-16 md:h-16 rounded-full bg-accent flex items-center justify-center overflow-hidden">
               {user.profileImage ? (
-                <img
-                  src={user.profileImage || "/placeholder.svg"}
-                  alt={user.name}
-                  className="w-full h-full object-cover"
-                />
+                <OptimizedImage src={user.profileImage} alt={user.name} className="w-full h-full" showSkeleton={false} />
               ) : (
                 <span className="text-2xl font-bold text-accent-foreground">{user.avatar}</span>
               )}
@@ -245,10 +245,10 @@ export default function ProfilePage() {
                 <Card key={item.id} className="p-3 md:p-4 hover:bg-muted transition-colors">
                   <div className="flex items-center justify-between gap-3 md:gap-4">
                     <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
-                      <img
-                        src={item.image || "/placeholder.svg"}
+                      <OptimizedImage
+                        src={item.image}
                         alt={item.name}
-                        className="w-12 h-12 md:w-16 md:h-16 object-cover rounded flex-shrink-0"
+                        className="w-12 h-12 md:w-16 md:h-16 rounded flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-foreground text-sm md:text-base truncate">{item.name}</h3>
