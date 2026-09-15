@@ -18,6 +18,16 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
 
+// Date.now() alone collides when two notifications fire within the same
+// millisecond (e.g. two queries failing back-to-back on page load), producing
+// duplicate React keys — this counter guarantees a unique id regardless of timing.
+let notificationIdCounter = 0
+
+function createNotificationId(): string {
+  notificationIdCounter += 1
+  return `${Date.now()}-${notificationIdCounter}`
+}
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
 
@@ -26,7 +36,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [])
 
   const addNotification = useCallback((message: string, type: Notification["type"] = "info", duration = 3000) => {
-    const id = Date.now().toString()
+    const id = createNotificationId()
     const notification: Notification = { id, message, type, duration }
 
     setNotifications((prev) => [...prev, notification])

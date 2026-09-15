@@ -25,15 +25,12 @@ import {
 import {
   CHAT_EVENTS,
   createChatSocket,
-  emitTyping,
   joinConversation,
   markConversationRead,
   sendChatMessage,
   type MessageReadEvent,
-  type TypingPayload,
 } from "@/lib/socket/chat-socket"
 
-const TYPING_DEBOUNCE_MS = 2000
 const PREDEFINED_ROLE = "customer"
 const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS
@@ -112,18 +109,18 @@ function MessageBubble({ message }: { message: Message }) {
 }
 
 interface PredefinedMessageGridProps {
-  messages: PredefinedMessage[]
+  predefinedMessages: PredefinedMessage[]
   onSelect: (message: PredefinedMessage) => void
 }
 
-function PredefinedMessageGrid({ messages, onSelect }: PredefinedMessageGridProps) {
-  if (messages.length === 0) return null
+function PredefinedMessageGrid({ predefinedMessages, onSelect }: PredefinedMessageGridProps) {
+  if (predefinedMessages.length === 0) return null
 
   return (
     <div className="p-3 sm:p-4 border-t border-border bg-card flex-shrink-0">
-      <p className="text-xs text-muted-foreground mb-3 text-center font-medium">💬 Select a quick reply to send:</p>
+      <p className="text-xs text-muted-foreground mb-3 text-center font-medium">💬 Select a message to send:</p>
       <div className="grid grid-cols-2 gap-2">
-        {messages.map((message) => (
+        {predefinedMessages.map((message) => (
           <Button
             key={message._id}
             onClick={() => onSelect(message)}
@@ -171,13 +168,9 @@ export default function ChatPage() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
-  const [messageInput, setMessageInput] = useState("")
-  const [isVendorTyping, setIsVendorTyping] = useState(false)
 
   const socketRef = useRef<Socket | null>(null)
   const selectedConversationIdRef = useRef<string | null>(null)
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isTypingRef = useRef(false)
 
   const conversationsQuery = useQuery({ queryKey: chatConversationsQueryKey, queryFn: fetchConversations })
   const conversations = useMemo(() => conversationsQuery.data ?? [], [conversationsQuery.data])
@@ -226,20 +219,14 @@ export default function ChatPage() {
     const handleMessageRead = (_event: MessageReadEvent) => {
       // Read receipts aren't surfaced in this UI yet; acknowledging the event keeps the listener list explicit.
     }
-    const handleTypingIndicator = (payload: TypingPayload) => {
-      if (payload.conversationId !== selectedConversationIdRef.current) return
-      setIsVendorTyping(payload.isTyping)
-    }
 
     socket.on(CHAT_EVENTS.messageReceived, handleMessageReceived)
     socket.on(CHAT_EVENTS.messageRead, handleMessageRead)
-    socket.on(CHAT_EVENTS.typingIndicator, handleTypingIndicator)
     socket.connect()
 
     return () => {
       socket.off(CHAT_EVENTS.messageReceived, handleMessageReceived)
       socket.off(CHAT_EVENTS.messageRead, handleMessageRead)
-      socket.off(CHAT_EVENTS.typingIndicator, handleTypingIndicator)
       socket.disconnect()
       socketRef.current = null
     }
@@ -265,62 +252,24 @@ export default function ChatPage() {
 
   useEffect(() => {
     setMessages([])
-    setIsVendorTyping(false)
   }, [selectedConversationId])
 
   useEffect(() => {
     if (messagesQuery.data) setMessages(sortMessagesChronologically(messagesQuery.data))
   }, [messagesQuery.data])
 
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-    }
-  }, [])
-
-  const stopTyping = (conversationId: string, userId: string) => {
-    isTypingRef.current = false
-    const socket = socketRef.current
-    if (socket) emitTyping(socket, { conversationId, userId, isTyping: false })
-  }
-
-  const handleMessageInputChange = (value: string) => {
-    setMessageInput(value)
+  const handleSelectPredefinedMessage = (predefined: PredefinedMessage) => {
     const socket = socketRef.current
     if (!socket || !selectedConversationId || !user) return
-
-    if (!isTypingRef.current) {
-      isTypingRef.current = true
-      emitTyping(socket, { conversationId: selectedConversationId, userId: user._id, isTyping: true })
-    }
-
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-    typingTimeoutRef.current = setTimeout(() => stopTyping(selectedConversationId, user._id), TYPING_DEBOUNCE_MS)
-  }
-
-  const sendMessage = (content: string, messageType: "text" | "predefined", predefinedMessageId?: string) => {
-    const socket = socketRef.current
-    if (!socket || !selectedConversationId || !user || !content.trim()) return
 
     sendChatMessage(socket, {
       conversationId: selectedConversationId,
       senderId: user._id,
       senderType: "customer",
-      messageType,
-      content,
-      predefinedMessageId,
+      messageType: "predefined",
+      content: predefined.text,
+      predefinedMessageId: predefined._id,
     })
-  }
-
-  const handleSendTextMessage = () => {
-    sendMessage(messageInput, "text")
-    setMessageInput("")
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
-    if (selectedConversationId && user) stopTyping(selectedConversationId, user._id)
-  }
-
-  const handleSelectPredefinedMessage = (predefined: PredefinedMessage) => {
-    sendMessage(predefined.text, "predefined", predefined._id)
   }
 
   const handleSelectConversation = (conversation: Conversation) => {
@@ -400,7 +349,7 @@ export default function ChatPage() {
                 <h3 className="font-semibold text-foreground text-sm sm:text-base truncate">
                   {selectedVendor?.profile.businessName ?? "Vendor"}
                 </h3>
-                <p className="text-xs text-muted-foreground">{isVendorTyping ? "typing…" : "Active now"}</p>
+                <p className="text-xs text-muted-foreground">Active now</p>
               </div>
             </div>
 
@@ -418,21 +367,10 @@ export default function ChatPage() {
               ))}
             </div>
 
-            <div className="p-3 sm:p-4 border-t border-border bg-card flex-shrink-0 flex gap-2">
-              <Input
-                type="text"
-                placeholder="Type a message..."
-                value={messageInput}
-                onChange={(e) => handleMessageInputChange(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSendTextMessage()}
-                className="text-sm"
-              />
-              <Button onClick={handleSendTextMessage} disabled={!messageInput.trim()}>
-                Send
-              </Button>
-            </div>
-
-            <PredefinedMessageGrid messages={predefinedQuery.data ?? []} onSelect={handleSelectPredefinedMessage} />
+            <PredefinedMessageGrid
+              predefinedMessages={predefinedQuery.data ?? []}
+              onSelect={handleSelectPredefinedMessage}
+            />
           </div>
         ) : (
           <div className="hidden md:flex md:col-span-2 border border-border rounded-lg items-center justify-center bg-card">
