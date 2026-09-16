@@ -11,6 +11,7 @@ import { useNotification } from "@/lib/notification-context"
 import { useRequireLoginAction } from "@/hooks/use-require-login-action"
 import { apiFetch } from "@/lib/api/client"
 import { fetchProduct, fetchProducts, type Product } from "@/lib/api/products"
+import { startConversation } from "@/lib/api/chat"
 import { OptimizedImage } from "@/components/optimized-image"
 import { ButtonWithLoader } from "@/components/button-with-loader"
 import { QueryErrorState, getApiErrorMessage } from "@/components/query-error-state"
@@ -97,7 +98,9 @@ export default function ProductDetailPage({ productId }: ProductDetailPageProps)
 
   const handleChatWithVendor = () => {
     requireLogin("Please log in to chat with vendors", () => {
-      router.push("/chat")
+      startConversation(product.vendorId)
+        .then((conversation) => router.push(`/chat?conversation=${conversation._id}`))
+        .catch((error) => addNotification(getApiErrorMessage(error), "error"))
     })
   }
 

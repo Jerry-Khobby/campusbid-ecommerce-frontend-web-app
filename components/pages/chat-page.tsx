@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { useQueries, useQuery } from "@tanstack/react-query"
 import type { Socket } from "socket.io-client"
 import { Button } from "@/components/ui/button"
@@ -163,10 +164,12 @@ function useVendorSummaries(conversations: Conversation[]): Map<string, VendorSu
 export default function ChatPage() {
   const { user } = useUser()
   const { addNotification } = useNotification()
+  const searchParams = useSearchParams()
+  const conversationIdFromUrl = searchParams.get("conversation")
 
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
-  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(conversationIdFromUrl)
+  const [isChatOpen, setIsChatOpen] = useState(conversationIdFromUrl !== null)
   const [messages, setMessages] = useState<Message[]>([])
 
   const socketRef = useRef<Socket | null>(null)
