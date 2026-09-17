@@ -91,8 +91,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }
 
   const logout = async () => {
-    await logoutUser()
-    setUser(null)
+    try {
+      await logoutUser()
+    } catch {
+      // The server call can fail (e.g. an already-expired access token) —
+      // logoutUser() already clears the stored tokens regardless, so the
+      // session still needs to clear from React state below.
+    } finally {
+      setUser(null)
+    }
   }
 
   const toggleSavedItem = (productId: string) => {
