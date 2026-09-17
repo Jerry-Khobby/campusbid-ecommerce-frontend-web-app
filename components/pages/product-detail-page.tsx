@@ -12,6 +12,7 @@ import { useRequireLoginAction } from "@/hooks/use-require-login-action"
 import { apiFetch } from "@/lib/api/client"
 import { fetchProduct, fetchProducts, type Product } from "@/lib/api/products"
 import { startConversation } from "@/lib/api/chat"
+import { useVendorReviews, type VendorReview } from "@/lib/api/reviews"
 import { OptimizedImage } from "@/components/optimized-image"
 import { ButtonWithLoader } from "@/components/button-with-loader"
 import { QueryErrorState, getApiErrorMessage } from "@/components/query-error-state"
@@ -218,7 +219,47 @@ export default function ProductDetailPage({ productId }: ProductDetailPageProps)
           </div>
         </div>
       )}
+
+      {vendorId && <VendorReviewsSection vendorId={vendorId} />}
     </main>
+  )
+}
+
+function VendorReviewsSection({ vendorId }: { vendorId: string }) {
+  const reviewsQuery = useVendorReviews(vendorId)
+  const reviews = reviewsQuery.data?.items ?? []
+
+  if (reviewsQuery.isLoading || reviews.length === 0) return null
+
+  return (
+    <div className="mt-8">
+      <h2 className="text-2xl font-bold text-foreground mb-4">Reviews</h2>
+      <div className="space-y-3">
+        {reviews.map((review) => (
+          <ReviewCard key={review._id} review={review} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function getReviewerName(review: VendorReview): string {
+  const name = [review.customerId?.profile?.firstName, review.customerId?.profile?.lastName]
+    .filter(Boolean)
+    .join(" ")
+  return name || "Anonymous"
+}
+
+function ReviewCard({ review }: { review: VendorReview }) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-2">
+        <p className="font-medium text-sm text-foreground">{getReviewerName(review)}</p>
+        <p className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</p>
+      </div>
+      <RatingStars average={review.rating} />
+      {review.review && <p className="text-sm text-muted-foreground mt-2">{review.review}</p>}
+    </Card>
   )
 }
 
