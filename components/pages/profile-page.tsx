@@ -676,11 +676,25 @@ function PaymentMethodsSection() {
   })
 
   const handleAddPaymentMethod = (values: PaymentMethodInput) => {
-    if (!values.provider.trim() || values.last4.trim().length !== 4) {
-      addNotification("Provider and a 4-digit card number are required", "error")
+    const isMobileMoney = values.type === "mobile_money"
+    const digits = values.last4.trim()
+
+    if (!values.provider.trim()) {
+      addNotification(isMobileMoney ? "Network is required" : "Provider is required", "error")
       return
     }
-    addPaymentMethodMutation.mutate(values)
+    if (isMobileMoney ? digits.length < 9 : digits.length !== 4) {
+      addNotification(
+        isMobileMoney ? "Enter a valid phone number" : "Enter the last 4 digits of the card",
+        "error",
+      )
+      return
+    }
+
+    // Stored masked the same way for both types — the phone number itself
+    // isn't a card number, but only its last 4 digits are kept for display
+    // ("MTN •••• 7081"), consistent with how a card is masked.
+    addPaymentMethodMutation.mutate({ ...values, last4: digits.slice(-4) })
   }
 
   if (paymentMethodsQuery.isLoading) return <LoadingCard label="Loading payment methods..." />
@@ -778,13 +792,13 @@ function AddPaymentMethodForm({
         <option value="mobile_money">Mobile Money</option>
       </select>
       <Input
-        placeholder="Provider (e.g. Visa, MTN MoMo)"
+        placeholder={values.type === "mobile_money" ? "Network (e.g. MTN, Vodafone, AirtelTigo)" : "Provider (e.g. Visa, Mastercard)"}
         value={values.provider}
         onChange={(event) => setValues({ ...values, provider: event.target.value })}
       />
       <Input
-        placeholder="Last 4 digits"
-        maxLength={4}
+        placeholder={values.type === "mobile_money" ? "Phone Number" : "Last 4 digits"}
+        maxLength={values.type === "mobile_money" ? 15 : 4}
         value={values.last4}
         onChange={(event) => setValues({ ...values, last4: event.target.value.replace(/\D/g, "") })}
       />
