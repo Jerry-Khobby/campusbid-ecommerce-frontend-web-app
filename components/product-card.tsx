@@ -30,10 +30,20 @@ export function ProductCard({ product, onSelect, onAddToCart, isSaved, onToggleS
     onToggleSave(product)
   }
 
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== "Enter" && event.key !== " ") return
+    event.preventDefault()
+    onSelect(product)
+  }
+
   return (
     <Card
       className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex flex-col"
       onClick={() => onSelect(product)}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`View ${product.name}`}
     >
       <div className="aspect-square bg-muted overflow-hidden">
         <OptimizedImage src={product.images[0] ?? "/placeholder.svg"} alt={product.name} className="w-full h-full" />
