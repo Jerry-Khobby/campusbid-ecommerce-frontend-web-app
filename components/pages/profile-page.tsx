@@ -247,7 +247,9 @@ function ProfileHeaderCard({
         </div>
         <div className="flex-1 text-center sm:text-left">
           <h2 className="text-xl font-bold text-foreground">{getDisplayName(user)}</h2>
-          <p className="text-sm md:text-base text-muted-foreground">{user.email}</p>
+          {getDisplayName(user) !== user.email && (
+            <p className="text-sm md:text-base text-muted-foreground">{user.email}</p>
+          )}
           <p className="text-xs md:text-sm text-muted-foreground mt-1">
             Member since {new Date(user.createdAt).toLocaleDateString()}
           </p>
