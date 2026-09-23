@@ -33,6 +33,7 @@ import {
 } from "@/lib/socket/chat-socket"
 
 const PREDEFINED_ROLE = "customer"
+const CHAT_INPUT_MAX_LENGTH = 1000
 const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS
 const DAY_MS = 24 * HOUR_MS
@@ -171,6 +172,7 @@ export default function ChatPage() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(conversationIdFromUrl)
   const [isChatOpen, setIsChatOpen] = useState(conversationIdFromUrl !== null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [messageDraft, setMessageDraft] = useState("")
 
   const socketRef = useRef<Socket | null>(null)
   const selectedConversationIdRef = useRef<string | null>(null)
@@ -255,6 +257,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     setMessages([])
+    setMessageDraft("")
   }, [selectedConversationId])
 
   useEffect(() => {
@@ -273,6 +276,21 @@ export default function ChatPage() {
       content: predefined.text,
       predefinedMessageId: predefined._id,
     })
+  }
+
+  const handleSendFreeTextMessage = () => {
+    const content = messageDraft.trim()
+    const socket = socketRef.current
+    if (!content || !socket || !selectedConversationId || !user) return
+
+    sendChatMessage(socket, {
+      conversationId: selectedConversationId,
+      senderId: user._id,
+      senderType: "customer",
+      messageType: "text",
+      content,
+    })
+    setMessageDraft("")
   }
 
   const handleSelectConversation = (conversation: Conversation) => {
@@ -374,6 +392,26 @@ export default function ChatPage() {
               predefinedMessages={predefinedQuery.data ?? []}
               onSelect={handleSelectPredefinedMessage}
             />
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                handleSendFreeTextMessage()
+              }}
+              className="p-3 sm:p-4 border-t border-border bg-card flex-shrink-0 flex items-center gap-2"
+            >
+              <Input
+                type="text"
+                placeholder="Type a message..."
+                value={messageDraft}
+                onChange={(e) => setMessageDraft(e.target.value)}
+                maxLength={CHAT_INPUT_MAX_LENGTH}
+                className="flex-1"
+              />
+              <Button type="submit" disabled={messageDraft.trim().length === 0}>
+                Send
+              </Button>
+            </form>
           </div>
         ) : (
           <div className="hidden md:flex md:col-span-2 border border-border rounded-lg items-center justify-center bg-card">
