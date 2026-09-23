@@ -227,7 +227,7 @@ export default function OrdersPage() {
 
                   {/* Cancellation reason */}
                   {order.cancellationReason && (
-                    <Card className="p-3 bg-destructive/5 border border-destructive/20 flex items-start gap-2">
+                    <Card className="p-3 bg-destructive/5 border border-destructive/20 flex-row items-start gap-2">
                       <AlertCircle size={16} className="text-destructive shrink-0 mt-0.5" />
                       <div>
                         <p className="text-xs font-semibold text-destructive">Cancelled</p>
@@ -238,7 +238,7 @@ export default function OrdersPage() {
 
                   {/* Escrow notice */}
                   {CANCELABLE_STATUSES.includes(order.status) && (
-                    <Card className="p-3 bg-accent/10 border border-accent/20 flex items-start gap-2">
+                    <Card className="p-3 bg-accent/10 border border-accent/20 flex-row items-start gap-2">
                       <AlertCircle size={16} className="text-accent shrink-0 mt-0.5" />
                       <div>
                         <p className="text-xs font-semibold text-accent">Payment Held</p>

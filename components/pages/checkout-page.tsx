@@ -233,7 +233,7 @@ export default function CheckoutPage() {
             </RadioGroup>
           </Card>
 
-          <Card className="p-4 bg-accent/10 border border-accent/20 flex items-start gap-3">
+          <Card className="p-4 bg-accent/10 border border-accent/20 flex-row items-start gap-3">
             <Lock size={20} className="text-accent shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-foreground">Secure Payment</p>

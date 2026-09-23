@@ -40,7 +40,7 @@ export default function CartPage() {
       {/* Cart Items */}
       <div className="space-y-4 mb-8">
         {items.map((item) => (
-          <Card key={item.id} className="p-4 flex gap-4">
+          <Card key={item.id} className="p-4 flex-row gap-4">
             {/* Image */}
             <div className="w-20 h-20 flex-shrink-0 bg-muted rounded-lg overflow-hidden">
               <OptimizedImage src={item.image} alt={item.name} className="w-full h-full" />

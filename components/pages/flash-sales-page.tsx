@@ -115,7 +115,7 @@ function MyBidRow({ flashSale, userId }: MyBidRowProps) {
   const countdown = useCountdown(flashSale.endTime)
 
   return (
-    <Card className="p-3 flex items-center gap-3">
+    <Card className="p-3 flex-row items-center gap-3">
       <div className="w-14 h-14 rounded overflow-hidden flex-shrink-0">
         <OptimizedImage src={getProductImage(flashSale)} alt={flashSale.productId.name} className="w-full h-full" />
       </div>
