@@ -10,6 +10,7 @@ import BottomNavigation from "@/components/bottom-navigation";
 import MainContent from "@/components/main-content";
 import { Providers } from "./providers";
 import { NotificationsSocketBridge } from "@/components/notifications-socket-bridge";
+import { NotificationBell } from "@/components/notification-bell";
 
 // Assigning to a const is required for Next's font-loader compiler plugin to
 // pick this up; the objects themselves aren't used directly. This self-hosts
@@ -37,6 +38,7 @@ export default function RootLayout({
               <CartProvider>
                 <NotificationsSocketBridge />
                 <div className="flex flex-col h-screen bg-background">
+                  <NotificationBell />
                   <MainContent>{children}</MainContent>
                   <BottomNavigation />
                   <NotificationToast />
