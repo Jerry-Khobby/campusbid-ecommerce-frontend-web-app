@@ -35,6 +35,7 @@ import {
   type Order,
   type OrderStatus,
   type OrderItemRecord,
+  type OrderStatusHistoryEntry,
 } from "@/lib/api/orders"
 import { useCreateReview } from "@/lib/api/reviews"
 import { useRefundPayment } from "@/lib/api/payments"
@@ -59,6 +60,41 @@ function getProductId(item: OrderItemRecord): string {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+}
+
+function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+}
+
+function OrderTimeline({ history }: { history: OrderStatusHistoryEntry[] }) {
+  if (history.length === 0) return null
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground mb-2">Order Timeline</p>
+      <div className="space-y-0">
+        {history.map((entry, index) => {
+          const isLast = index === history.length - 1
+          const config = ORDER_STATUS_CONFIG[entry.status]
+          return (
+            <div key={`${entry.status}-${entry.timestamp}`} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted shrink-0">
+                  {config.icon}
+                </div>
+                {!isLast && <div className="w-px flex-1 bg-border my-0.5" />}
+              </div>
+              <div className={isLast ? "pb-0" : "pb-4"}>
+                <p className="text-sm font-medium text-foreground">{config.label}</p>
+                <p className="text-xs text-muted-foreground">{formatDateTime(entry.timestamp)}</p>
+                {entry.note && <p className="text-xs text-muted-foreground mt-0.5">{entry.note}</p>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function StarRating({ value, onChange }: { value: number; onChange: (value: number) => void }) {
@@ -220,6 +256,9 @@ export default function OrdersPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Timeline */}
+                  <OrderTimeline history={order.statusHistory} />
 
                   {/* Estimated Delivery */}
                   {order.estimatedDeliveryTime && (
