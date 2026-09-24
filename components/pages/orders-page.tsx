@@ -37,6 +37,7 @@ import {
   type OrderItemRecord,
 } from "@/lib/api/orders"
 import { useCreateReview } from "@/lib/api/reviews"
+import { useRefundPayment } from "@/lib/api/payments"
 
 const ORDER_STATUS_CONFIG: Record<OrderStatus, { icon: React.ReactNode; label: string; cardClassName: string }> = {
   pending: { icon: <Clock size={20} className="text-muted-foreground" />, label: "Pending", cardClassName: "bg-muted" },
@@ -72,12 +73,13 @@ function StarRating({ value, onChange }: { value: number; onChange: (value: numb
   )
 }
 
-type ActiveAction = { orderId: string; mode: "cancel" | "confirmDelivery" }
+type ActiveAction = { orderId: string; mode: "cancel" | "confirmDelivery" | "dispute" }
 
 export default function OrdersPage() {
   const { data: orders, isLoading, isError } = useOrders()
   const cancelOrder = useCancelOrder()
   const confirmDelivery = useConfirmDelivery()
+  const refundPayment = useRefundPayment()
   const createReview = useCreateReview()
   const { addNotification } = useNotification()
 
@@ -86,6 +88,7 @@ export default function OrdersPage() {
   const [cancelReason, setCancelReason] = useState("")
   const [confirmRating, setConfirmRating] = useState(0)
   const [confirmReview, setConfirmReview] = useState("")
+  const [disputeReason, setDisputeReason] = useState("")
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null)
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set())
 
@@ -94,6 +97,7 @@ export default function OrdersPage() {
     setCancelReason("")
     setConfirmRating(0)
     setConfirmReview("")
+    setDisputeReason("")
   }
 
   const handleCancel = async (order: Order) => {
@@ -121,6 +125,24 @@ export default function OrdersPage() {
       closeAction()
     } catch (error) {
       addNotification(error instanceof ApiError ? error.message : "Could not confirm delivery.", "error")
+    }
+  }
+
+  const handleDispute = async (order: Order) => {
+    if (!disputeReason.trim()) {
+      addNotification("Please describe what went wrong.", "error")
+      return
+    }
+    if (!order.paymentId) {
+      addNotification("This order has no payment on file to dispute.", "error")
+      return
+    }
+    try {
+      await refundPayment.mutateAsync({ paymentId: order.paymentId, reason: disputeReason.trim() })
+      addNotification("Dispute submitted. Your payment has been refunded.", "success")
+      closeAction()
+    } catch (error) {
+      addNotification(error instanceof ApiError ? error.message : "Could not submit this dispute.", "error")
     }
   }
 
@@ -284,14 +306,47 @@ export default function OrdersPage() {
                     </div>
                   )}
 
-                  {/* Confirm delivery action */}
+                  {/* Confirm delivery / dispute actions */}
                   {order.status === "delivered" && !isActionOnThisOrder && (
-                    <Button
-                      onClick={() => setActiveAction({ orderId: order._id, mode: "confirmDelivery" })}
-                      className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
-                    >
-                      Confirm Delivery & Release Payment
-                    </Button>
+                    <div className="space-y-2">
+                      <Button
+                        onClick={() => setActiveAction({ orderId: order._id, mode: "confirmDelivery" })}
+                        className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
+                      >
+                        Confirm Delivery & Release Payment
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setActiveAction({ orderId: order._id, mode: "dispute" })}
+                        className="w-full text-destructive hover:text-destructive"
+                      >
+                        Report a Problem
+                      </Button>
+                    </div>
+                  )}
+
+                  {isActionOnThisOrder && activeAction?.mode === "dispute" && (
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium text-foreground block">What went wrong?</label>
+                      <Textarea
+                        value={disputeReason}
+                        onChange={(e) => setDisputeReason(e.target.value)}
+                        placeholder="e.g. wrong item, missing items, damaged on arrival"
+                      />
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={closeAction} className="flex-1">
+                          Back
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={() => handleDispute(order)}
+                          disabled={refundPayment.isPending}
+                          className="flex-1"
+                        >
+                          {refundPayment.isPending ? "Submitting..." : "Submit Dispute & Refund"}
+                        </Button>
+                      </div>
+                    </div>
                   )}
 
                   {isActionOnThisOrder && activeAction?.mode === "confirmDelivery" && (

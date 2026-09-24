@@ -3,8 +3,9 @@
 // result directly (confirmed by reading payment.controller.ts) — no
 // {success, message, data} envelope here.
 
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiFetch } from "./client"
+import { ordersQueryKey } from "./orders"
 
 export type PaymentMethod = "card" | "mobile_money"
 export type PaymentStatus = "pending" | "held" | "released" | "refunded" | "failed"
@@ -60,3 +61,24 @@ export function useInitializePayment() {
 
 export const PAYMENT_POLL_INTERVAL_MS = 2000
 export const PAYMENT_MAX_POLL_ATTEMPTS = 30
+
+export interface RefundPaymentInput {
+  paymentId: string
+  reason: string
+  amount?: number
+}
+
+async function refundPayment({ paymentId, reason, amount }: RefundPaymentInput): Promise<Payment> {
+  return apiFetch<Payment>(`/payments/${paymentId}/refund`, {
+    method: "PUT",
+    body: amount !== undefined ? { reason, amount } : { reason },
+  })
+}
+
+export function useRefundPayment() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: refundPayment,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ordersQueryKey }),
+  })
+}
