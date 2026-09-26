@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react"
 import { useQuery, type Query } from "@tanstack/react-query"
@@ -22,6 +22,14 @@ import {
 const REDIRECT_DELAY_MS = 2000
 
 export default function PaymentCallbackPage() {
+  return (
+    <Suspense fallback={<CallbackShell><Spinner className="mx-auto mb-4 size-10" /></CallbackShell>}>
+      <PaymentCallbackPageInner />
+    </Suspense>
+  )
+}
+
+function PaymentCallbackPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const paymentId = searchParams.get("paymentId")

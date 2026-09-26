@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { Suspense, useState } from "react"
 import { Lock } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,14 @@ import { ApiError } from "@/lib/api/client"
 import { useRouter, useSearchParams } from "next/navigation"
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordPageInner />
+    </Suspense>
+  )
+}
+
+function ResetPasswordPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
