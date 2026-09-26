@@ -22,8 +22,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login, register } = useUser();
+  const { login, register, isLoggedIn, isLoading } = useUser();
   const { addNotification } = useNotification();
+
+  useEffect(() => {
+    if (!isLoading && isLoggedIn) {
+      router.replace(redirectTo);
+    }
+  }, [isLoading, isLoggedIn, redirectTo, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +56,10 @@ export default function LoginPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoading || isLoggedIn) {
+    return null;
+  }
 
   return (
     <main className="w-full min-h-screen bg-gradient-to-br from-background to-muted flex items-center justify-center px-4 py-8">
