@@ -7,6 +7,7 @@ import { useCart } from "@/lib/cart-context"
 import { useRouter } from "next/navigation"
 import { DELIVERY_FEE } from "@/lib/constants"
 import { OptimizedImage } from "@/components/optimized-image"
+import { formatCurrency } from "@/lib/format"
 
 export default function CartPage() {
   const router = useRouter()
@@ -52,7 +53,7 @@ export default function CartPage() {
                 <h3 className="font-semibold text-foreground">{item.name}</h3>
                 <p className="text-sm text-muted-foreground">{item.vendor}</p>
               </div>
-              <p className="font-bold text-accent">${item.price.toFixed(2)}</p>
+              <p className="font-bold text-accent">{formatCurrency(item.price)}</p>
             </div>
 
             {/* Quantity Controls */}
@@ -88,15 +89,15 @@ export default function CartPage() {
         <div className="space-y-3 mb-6">
           <div className="flex justify-between text-foreground">
             <span>Subtotal</span>
-            <span>${total.toFixed(2)}</span>
+            <span>{formatCurrency(total)}</span>
           </div>
           <div className="flex justify-between text-foreground">
             <span>Delivery Fee</span>
-            <span>${DELIVERY_FEE.toFixed(2)}</span>
+            <span>{formatCurrency(DELIVERY_FEE)}</span>
           </div>
           <div className="border-t border-border pt-3 flex justify-between font-bold text-lg text-foreground">
             <span>Total</span>
-            <span className="text-accent">${(total + DELIVERY_FEE).toFixed(2)}</span>
+            <span className="text-accent">{formatCurrency(total + DELIVERY_FEE)}</span>
           </div>
         </div>
 

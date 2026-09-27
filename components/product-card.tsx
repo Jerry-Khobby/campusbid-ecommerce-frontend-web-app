@@ -5,6 +5,7 @@ import { Heart, Plus } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ButtonWithLoader } from "@/components/button-with-loader"
+import { formatCurrency } from "@/lib/format"
 import { OptimizedImage } from "@/components/optimized-image"
 import type { Product } from "@/lib/api/products"
 
@@ -54,8 +55,8 @@ export function ProductCard({ product, onSelect, onAddToCart, isSaved, onToggleS
           <h3 className="font-semibold text-xs text-foreground line-clamp-2 mb-1">{product.name}</h3>
         </div>
         <div className="flex items-center gap-2 mb-2">
-          <span className="font-bold text-accent text-sm">${displayPrice.toFixed(2)}</span>
-          {hasDiscount && <span className="text-xs text-muted-foreground line-through">${product.price.toFixed(2)}</span>}
+          <span className="font-bold text-accent text-sm">{formatCurrency(displayPrice)}</span>
+          {hasDiscount && <span className="text-xs text-muted-foreground line-through">{formatCurrency(product.price)}</span>}
         </div>
         <div className="flex gap-1">
           <ButtonWithLoader

@@ -5,16 +5,25 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, Lock, MapPin } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useCart, type CartItem } from "@/lib/cart-context"
 import { useUser } from "@/lib/user-context"
 import { useNotification } from "@/lib/notification-context"
 import { ApiError } from "@/lib/api/client"
 import { useCreateOrder } from "@/lib/api/orders"
-import { useInitializePayment, type PaymentMethod } from "@/lib/api/payments"
+import {
+  useInitializePayment,
+  useSubmitMomoOtp,
+  MOMO_PROVIDER_OPTIONS,
+  type PaymentMethod,
+  type MomoProvider,
+} from "@/lib/api/payments"
 import { DELIVERY_FEE, SERVICE_FEE } from "@/lib/constants"
+import { formatCurrency } from "@/lib/format"
 
 type CheckoutStep = "address" | "payment"
 
@@ -35,6 +44,7 @@ export default function CheckoutPage() {
   const { addNotification } = useNotification()
   const createOrder = useCreateOrder()
   const initializePayment = useInitializePayment()
+  const submitMomoOtp = useSubmitMomoOtp()
 
   const vendorGroups = useMemo(() => groupItemsByVendor(items), [items])
   const singleVendorItems = vendorGroups.size === 1 ? [...vendorGroups.values()][0] : []
@@ -44,41 +54,93 @@ export default function CheckoutPage() {
   const [addressId, setAddressId] = useState(() => user?.addresses.find((a) => a.isDefault)?._id ?? user?.addresses[0]?._id ?? "")
   const [customerNotes, setCustomerNotes] = useState("")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
+  const [momoProvider, setMomoProvider] = useState<MomoProvider>("mtn")
+  const [phone, setPhone] = useState("")
+
+  // Set once an order is successfully created, so a retry after a failed
+  // payment reuses the same order instead of creating a duplicate.
+  const [orderId, setOrderId] = useState<string | null>(null)
+  const [pendingOtpPaymentId, setPendingOtpPaymentId] = useState<string | null>(null)
+  const [otp, setOtp] = useState("")
 
   const selectedAddress = user?.addresses.find((a) => a._id === addressId)
   const subtotal = singleVendorItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const total = subtotal + DELIVERY_FEE + SERVICE_FEE
-  const isPlacingOrder = createOrder.isPending || initializePayment.isPending
+  const isPlacingOrder = createOrder.isPending || initializePayment.isPending || submitMomoOtp.isPending
+  const isPhoneValid = /^0\d{9}$/.test(phone)
 
   const handlePlaceOrder = async () => {
     if (!selectedAddress) return
+    if (paymentMethod === "mobile_money" && !isPhoneValid) {
+      addNotification("Enter a valid mobile money number, e.g. 0551234567", "error")
+      return
+    }
 
     try {
-      const order = await createOrder.mutateAsync({
-        vendorId,
-        items: singleVendorItems.map((item) => ({
-          productId: item.id,
-          productName: item.name,
-          productImage: item.image,
-          quantity: item.quantity,
-          price: item.price,
-        })),
-        pricing: { subtotal, deliveryFee: DELIVERY_FEE, serviceFee: SERVICE_FEE, total },
-        deliveryAddress: {
-          label: selectedAddress.label,
-          building: selectedAddress.building,
-          room: selectedAddress.room,
-          instructions: selectedAddress.instructions,
-          location: selectedAddress.location,
-        },
-        customerNotes: customerNotes || undefined,
+      // Reuse the order from a previous failed attempt instead of creating a
+      // duplicate — the order itself was already placed with the vendor.
+      let currentOrderId = orderId
+      if (!currentOrderId) {
+        const order = await createOrder.mutateAsync({
+          vendorId,
+          items: singleVendorItems.map((item) => ({
+            productId: item.id,
+            productName: item.name,
+            productImage: item.image,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          pricing: { subtotal, deliveryFee: DELIVERY_FEE, serviceFee: SERVICE_FEE, total },
+          deliveryAddress: {
+            label: selectedAddress.label,
+            building: selectedAddress.building,
+            room: selectedAddress.room,
+            instructions: selectedAddress.instructions,
+            location: selectedAddress.location,
+          },
+          customerNotes: customerNotes || undefined,
+        })
+        currentOrderId = order._id
+        setOrderId(currentOrderId)
+      }
+
+      const payment = await initializePayment.mutateAsync({
+        orderId: currentOrderId,
+        paymentMethod,
+        ...(paymentMethod === "mobile_money" ? { momoProvider, phone } : {}),
       })
 
-      const payment = await initializePayment.mutateAsync({ orderId: order._id, paymentMethod })
+      if (payment.paymentMethod === "card") {
+        clearCart()
+        window.location.href = payment.authorizationUrl
+        return
+      }
+
+      // Mobile money: no redirect. MTN etc. typically need the customer to
+      // approve a prompt on their phone ("pay_offline"); some networks
+      // instead text an OTP that must be typed back in ("send_otp").
+      if (payment.status === "send_otp") {
+        setPendingOtpPaymentId(payment.paymentId)
+        return
+      }
+
       clearCart()
-      window.location.href = payment.authorizationUrl
+      router.push(`/payments/callback?paymentId=${payment.paymentId}`)
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Something went wrong placing your order."
+      addNotification(message, "error")
+    }
+  }
+
+  const handleSubmitOtp = async () => {
+    if (!pendingOtpPaymentId || !otp) return
+
+    try {
+      await submitMomoOtp.mutateAsync({ paymentId: pendingOtpPaymentId, otp })
+      clearCart()
+      router.push(`/payments/callback?paymentId=${pendingOtpPaymentId}`)
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : "Could not verify that code. Please try again."
       addNotification(message, "error")
     }
   }
@@ -207,7 +269,32 @@ export default function CheckoutPage() {
       )}
 
       {/* Payment Step */}
-      {step === "payment" && (
+      {step === "payment" && pendingOtpPaymentId && (
+        <div className="space-y-4 mb-8">
+          <Card className="p-6">
+            <h2 className="text-xl font-bold text-foreground mb-2">Enter your OTP</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Your mobile money provider sent a one-time code to {phone} to authorize this payment.
+            </p>
+            <Input
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              placeholder="123456"
+              inputMode="numeric"
+              maxLength={6}
+            />
+          </Card>
+          <Button
+            onClick={handleSubmitOtp}
+            disabled={isPlacingOrder || !otp}
+            className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-6"
+          >
+            {isPlacingOrder ? "Verifying..." : "Verify & Pay"}
+          </Button>
+        </div>
+      )}
+
+      {step === "payment" && !pendingOtpPaymentId && (
         <div className="space-y-4 mb-8">
           <Card className="p-6">
             <h2 className="text-xl font-bold text-foreground mb-4">Payment Method</h2>
@@ -231,6 +318,35 @@ export default function CheckoutPage() {
                 <span className="font-medium text-foreground">Mobile Money</span>
               </Label>
             </RadioGroup>
+
+            {paymentMethod === "mobile_money" && (
+              <div className="mt-4 space-y-3 pl-1">
+                <div>
+                  <label className="text-sm font-medium text-foreground block mb-2">Network</label>
+                  <Select value={momoProvider} onValueChange={(value) => setMomoProvider(value as MomoProvider)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MOMO_PROVIDER_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-foreground block mb-2">Mobile Money Number</label>
+                  <Input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="0551234567"
+                    inputMode="tel"
+                  />
+                </div>
+              </div>
+            )}
           </Card>
 
           <Card className="p-4 bg-accent/10 border border-accent/20 flex-row items-start gap-3">
@@ -238,15 +354,16 @@ export default function CheckoutPage() {
             <div>
               <p className="text-sm font-medium text-foreground">Secure Payment</p>
               <p className="text-xs text-muted-foreground">
-                You'll be redirected to Paystack to complete payment. Your payment is held until delivery is
-                confirmed.
+                {paymentMethod === "card"
+                  ? "You'll be redirected to Paystack to complete payment. Your payment is held until delivery is confirmed."
+                  : "You'll be asked to approve this payment on your phone. Your payment is held until delivery is confirmed."}
               </p>
             </div>
           </Card>
 
           <Button
             onClick={handlePlaceOrder}
-            disabled={isPlacingOrder}
+            disabled={isPlacingOrder || (paymentMethod === "mobile_money" && !isPhoneValid)}
             className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-6"
           >
             {isPlacingOrder ? "Placing Order..." : "Place Order"}
@@ -263,27 +380,27 @@ export default function CheckoutPage() {
               <span className="text-foreground">
                 {item.name} x{item.quantity}
               </span>
-              <span className="font-semibold text-foreground">${(item.price * item.quantity).toFixed(2)}</span>
+              <span className="font-semibold text-foreground">{formatCurrency(item.price * item.quantity)}</span>
             </div>
           ))}
           <div className="border-t border-border pt-3 space-y-1">
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Subtotal</span>
-              <span>${subtotal.toFixed(2)}</span>
+              <span>{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Delivery Fee</span>
-              <span>${DELIVERY_FEE.toFixed(2)}</span>
+              <span>{formatCurrency(DELIVERY_FEE)}</span>
             </div>
             {SERVICE_FEE > 0 && (
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Service Fee</span>
-                <span>${SERVICE_FEE.toFixed(2)}</span>
+                <span>{formatCurrency(SERVICE_FEE)}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-foreground pt-1">
               <span>Total</span>
-              <span className="text-accent">${total.toFixed(2)}</span>
+              <span className="text-accent">{formatCurrency(total)}</span>
             </div>
           </div>
         </div>

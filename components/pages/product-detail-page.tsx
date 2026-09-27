@@ -5,6 +5,7 @@ import { ArrowLeft, MapPin, Star, MessageSquare, Plus, CheckCircle2, Heart } fro
 import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { formatCurrency } from "@/lib/format"
 import { useCart } from "@/lib/cart-context"
 import { useUser } from "@/lib/user-context"
 import { useNotification } from "@/lib/notification-context"
@@ -135,9 +136,9 @@ export default function ProductDetailPage({ productId }: ProductDetailPageProps)
 
             <div className="mb-6">
               <div className="flex items-center gap-3">
-                <p className="text-4xl font-bold text-accent">${displayPrice.toFixed(2)}</p>
+                <p className="text-4xl font-bold text-accent">{formatCurrency(displayPrice)}</p>
                 {product.discountPrice !== undefined && product.discountPrice < product.price && (
-                  <p className="text-lg text-muted-foreground line-through">${product.price.toFixed(2)}</p>
+                  <p className="text-lg text-muted-foreground line-through">{formatCurrency(product.price)}</p>
                 )}
               </div>
               {product.rating.count > 0 && (
@@ -211,7 +212,7 @@ export default function ProductDetailPage({ productId }: ProductDetailPageProps)
                 <div className="p-2">
                   <h3 className="font-semibold text-xs text-foreground line-clamp-2 mb-1">{vendorProduct.name}</h3>
                   <p className="text-xs text-accent font-bold">
-                    ${(vendorProduct.discountPrice ?? vendorProduct.price).toFixed(2)}
+                    {formatCurrency(vendorProduct.discountPrice ?? vendorProduct.price)}
                   </p>
                 </div>
               </Card>

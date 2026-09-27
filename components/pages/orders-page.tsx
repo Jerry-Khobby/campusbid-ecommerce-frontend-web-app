@@ -16,6 +16,7 @@ import {
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { formatCurrency } from "@/lib/format"
 import {
   Dialog,
   DialogContent,
@@ -231,7 +232,7 @@ export default function OrdersPage() {
                   <p className="text-sm text-muted-foreground">{getOrderVendorName(order)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-accent">${order.pricing.total.toFixed(2)}</p>
+                  <p className="font-bold text-accent">{formatCurrency(order.pricing.total)}</p>
                   <p className="text-xs text-muted-foreground">{formatDate(order.createdAt)}</p>
                 </div>
               </div>
@@ -252,7 +253,7 @@ export default function OrdersPage() {
                         <span className="text-foreground">
                           {item.productName} x{item.quantity}
                         </span>
-                        <span className="text-muted-foreground">${(item.price * item.quantity).toFixed(2)}</span>
+                        <span className="text-muted-foreground">{formatCurrency(item.price * item.quantity)}</span>
                       </div>
                     ))}
                   </div>

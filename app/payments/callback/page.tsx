@@ -7,14 +7,19 @@ import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react"
 import { useQuery, type Query } from "@tanstack/react-query"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useNotification } from "@/lib/notification-context"
 import { ApiError } from "@/lib/api/client"
 import {
   fetchPayment,
   paymentQueryKey,
   useInitializePayment,
+  useSubmitMomoOtp,
+  MOMO_PROVIDER_OPTIONS,
   type Payment,
+  type MomoProvider,
   PAYMENT_POLL_INTERVAL_MS,
   PAYMENT_MAX_POLL_ATTEMPTS,
 } from "@/lib/api/payments"
@@ -54,8 +59,13 @@ function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
   const router = useRouter()
   const { addNotification } = useNotification()
   const initializePayment = useInitializePayment()
+  const submitMomoOtp = useSubmitMomoOtp()
   const attemptsRef = useRef(0)
   const [attempts, setAttempts] = useState(0)
+  const [retryProvider, setRetryProvider] = useState<MomoProvider>("mtn")
+  const [retryPhone, setRetryPhone] = useState("")
+  const [retryOtpPaymentId, setRetryOtpPaymentId] = useState<string | null>(null)
+  const [retryOtp, setRetryOtp] = useState("")
 
   const { data: payment, isLoading } = useQuery({
     queryKey: paymentQueryKey(paymentId),
@@ -82,13 +92,52 @@ function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
     }
   }, [payment?.status, router])
 
-  const handleRetry = async () => {
+  useEffect(() => {
+    if (payment?.paymentMethod === "mobile_money" && payment.metadata?.phone) {
+      setRetryPhone(payment.metadata.phone)
+      if (payment.metadata.momoProvider) setRetryProvider(payment.metadata.momoProvider)
+    }
+  }, [payment])
+
+  const handleRetryCard = async () => {
     if (!payment) return
     try {
-      const result = await initializePayment.mutateAsync({ orderId: payment.orderId, paymentMethod: payment.paymentMethod })
-      window.location.href = result.authorizationUrl
+      const result = await initializePayment.mutateAsync({ orderId: payment.orderId, paymentMethod: "card" })
+      window.location.href = (result as { authorizationUrl: string }).authorizationUrl
     } catch (error) {
       addNotification(error instanceof ApiError ? error.message : "Could not restart payment. Please try again.", "error")
+    }
+  }
+
+  const handleRetryMomo = async () => {
+    if (!payment || !/^0\d{9}$/.test(retryPhone)) {
+      addNotification("Enter a valid mobile money number, e.g. 0551234567", "error")
+      return
+    }
+    try {
+      const result = await initializePayment.mutateAsync({
+        orderId: payment.orderId,
+        paymentMethod: "mobile_money",
+        momoProvider: retryProvider,
+        phone: retryPhone,
+      })
+      if (result.paymentMethod === "mobile_money" && result.status === "send_otp") {
+        setRetryOtpPaymentId(result.paymentId)
+        return
+      }
+      router.replace(`/payments/callback?paymentId=${result.paymentId}`)
+    } catch (error) {
+      addNotification(error instanceof ApiError ? error.message : "Could not restart payment. Please try again.", "error")
+    }
+  }
+
+  const handleSubmitRetryOtp = async () => {
+    if (!retryOtpPaymentId || !retryOtp) return
+    try {
+      await submitMomoOtp.mutateAsync({ paymentId: retryOtpPaymentId, otp: retryOtp })
+      router.replace(`/payments/callback?paymentId=${retryOtpPaymentId}`)
+    } catch (error) {
+      addNotification(error instanceof ApiError ? error.message : "Could not verify that code. Please try again.", "error")
     }
   }
 
@@ -98,6 +147,32 @@ function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
         <Spinner className="mx-auto mb-4 size-10" />
         <h1 className="text-xl font-bold text-foreground mb-2">Confirming your payment...</h1>
         <p className="text-muted-foreground">This will only take a moment.</p>
+      </CallbackShell>
+    )
+  }
+
+  if (retryOtpPaymentId) {
+    return (
+      <CallbackShell>
+        <h1 className="text-xl font-bold text-foreground mb-2">Enter your OTP</h1>
+        <p className="text-sm text-muted-foreground mb-4">
+          Your mobile money provider sent a one-time code to {retryPhone} to authorize this payment.
+        </p>
+        <Input
+          value={retryOtp}
+          onChange={(e) => setRetryOtp(e.target.value)}
+          placeholder="123456"
+          inputMode="numeric"
+          maxLength={6}
+          className="mb-4"
+        />
+        <Button
+          onClick={handleSubmitRetryOtp}
+          disabled={submitMomoOtp.isPending || !retryOtp}
+          className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
+        >
+          {submitMomoOtp.isPending ? "Verifying..." : "Verify & Pay"}
+        </Button>
       </CallbackShell>
     )
   }
@@ -144,14 +219,52 @@ function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
     )
   }
 
-  if (payment.status === "failed") {
+  if (payment.status === "failed" && payment.paymentMethod === "card") {
     return (
       <CallbackShell>
         <XCircle size={48} className="text-destructive mx-auto mb-4" />
         <h1 className="text-xl font-bold text-foreground mb-2">Payment failed</h1>
         <p className="text-muted-foreground mb-6">Your payment could not be completed. You can try again.</p>
         <Button
-          onClick={handleRetry}
+          onClick={handleRetryCard}
+          disabled={initializePayment.isPending}
+          className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
+        >
+          {initializePayment.isPending ? "Restarting..." : "Try Again"}
+        </Button>
+      </CallbackShell>
+    )
+  }
+
+  if (payment.status === "failed" && payment.paymentMethod === "mobile_money") {
+    return (
+      <CallbackShell>
+        <XCircle size={48} className="text-destructive mx-auto mb-4" />
+        <h1 className="text-xl font-bold text-foreground mb-2">Payment failed</h1>
+        <p className="text-muted-foreground mb-6">Your payment could not be completed. You can try again below.</p>
+        <div className="space-y-3 text-left mb-4">
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-2">Network</label>
+            <Select value={retryProvider} onValueChange={(value) => setRetryProvider(value as MomoProvider)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MOMO_PROVIDER_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground block mb-2">Mobile Money Number</label>
+            <Input value={retryPhone} onChange={(e) => setRetryPhone(e.target.value)} placeholder="0551234567" inputMode="tel" />
+          </div>
+        </div>
+        <Button
+          onClick={handleRetryMomo}
           disabled={initializePayment.isPending}
           className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
         >

@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { OptimizedImage } from "@/components/optimized-image"
 import { ApiError } from "@/lib/api/client"
+import { formatCurrency } from "@/lib/format"
 import { getDisplayName, getInitials, useUser } from "@/lib/user-context"
 import { useNotification } from "@/lib/notification-context"
 import { fetchProduct, type Product } from "@/lib/api/products"
@@ -869,7 +870,7 @@ function SavedItemCard({ item, onRemove }: { item: Product; onRemove: () => void
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-foreground text-sm md:text-base truncate">{item.name}</h3>
             <p className="text-xs md:text-sm text-muted-foreground truncate">{item.category}</p>
-            <p className="text-sm md:text-base font-bold text-accent mt-1">${displayPrice.toFixed(2)}</p>
+            <p className="text-sm md:text-base font-bold text-accent mt-1">{formatCurrency(displayPrice)}</p>
           </div>
         </div>
         <button onClick={onRemove} className="p-2 hover:bg-muted rounded-lg transition-colors flex-shrink-0">

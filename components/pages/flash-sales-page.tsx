@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { formatCurrency } from "@/lib/format"
 import { useNotification } from "@/lib/notification-context"
 import { useUser } from "@/lib/user-context"
 import { useRequireLoginAction } from "@/hooks/use-require-login-action"
@@ -64,8 +65,8 @@ function FlashSaleCard({ flashSale, onBid }: FlashSaleCardProps) {
           <h3 className="font-bold text-xs text-foreground mb-1 line-clamp-2">{flashSale.productId.name}</h3>
           <p className="text-xs text-muted-foreground mb-1">{getVendorName(flashSale)}</p>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs line-through text-muted-foreground">${flashSale.originalPrice.toFixed(2)}</span>
-            <span className="text-sm font-bold text-accent">${getHighestBid(flashSale).toFixed(2)}</span>
+            <span className="text-xs line-through text-muted-foreground">{formatCurrency(flashSale.originalPrice)}</span>
+            <span className="text-sm font-bold text-accent">{formatCurrency(getHighestBid(flashSale))}</span>
           </div>
           <p className="text-xs text-muted-foreground">{flashSale.bids.length} bids</p>
         </div>
@@ -123,8 +124,7 @@ function MyBidRow({ flashSale, userId }: MyBidRowProps) {
         <h3 className="font-semibold text-sm text-foreground truncate">{flashSale.productId.name}</h3>
         <p className="text-xs text-muted-foreground">{getVendorName(flashSale)}</p>
         <p className="text-xs text-muted-foreground">
-          Your bid: ${getMyBidAmount(flashSale, userId).toFixed(2)} · Highest: $
-          {getHighestBid(flashSale).toFixed(2)}
+          Your bid: {formatCurrency(getMyBidAmount(flashSale, userId))} · Highest: {formatCurrency(getHighestBid(flashSale))}
         </p>
       </div>
       <div className="flex flex-col items-end gap-1">
@@ -197,14 +197,14 @@ function BidModal({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Original Price:</span>
-              <span className="line-through text-muted-foreground">${flashSale.originalPrice.toFixed(2)}</span>
+              <span className="line-through text-muted-foreground">{formatCurrency(flashSale.originalPrice)}</span>
             </div>
           </div>
 
           <div className="mb-6">
             <label className="block text-sm font-semibold text-foreground mb-2">Your Bid Amount</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground">$</span>
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-foreground">₵</span>
               <Input
                 type="number"
                 value={bidAmount}
@@ -216,9 +216,9 @@ function BidModal({
               />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Current highest bid: ${getHighestBid(flashSale).toFixed(2)}
+              Current highest bid: {formatCurrency(getHighestBid(flashSale))}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Minimum bid: ${minimumBid.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Minimum bid: {formatCurrency(minimumBid)}</p>
           </div>
 
           <div className="mb-6 pb-6 border-b">
@@ -233,7 +233,7 @@ function BidModal({
                     <p className="font-medium text-foreground">{getBidderLabel(bid, currentUserId)}</p>
                     <p className="text-xs text-muted-foreground">{formatBidTime(bid.timestamp)}</p>
                   </div>
-                  <span className="font-bold text-accent">${bid.amount.toFixed(2)}</span>
+                  <span className="font-bold text-accent">{formatCurrency(bid.amount)}</span>
                 </div>
               ))}
             </div>
@@ -299,7 +299,7 @@ export default function FlashSalesPage() {
         previous?.map((sale) => (sale._id === updatedSale._id ? updatedSale : sale)) ?? previous,
       )
       queryClient.invalidateQueries({ queryKey: flashSaleQueryKey(updatedSale._id) })
-      addNotification(`Bid of $${(updatedSale.currentBid ?? 0).toFixed(2)} placed successfully!`, "success")
+      addNotification(`Bid of ${formatCurrency(updatedSale.currentBid ?? 0)} placed successfully!`, "success")
       setBidAmount(getMinimumBidAmount(updatedSale).toString())
     },
     onError: (error) => {
@@ -328,7 +328,7 @@ export default function FlashSalesPage() {
     const minimumBid = getMinimumBidAmount(selectedSale)
 
     if (!Number.isFinite(amount) || amount < minimumBid) {
-      addNotification(`Bid must be at least $${minimumBid.toFixed(2)}`, "error")
+      addNotification(`Bid must be at least ${formatCurrency(minimumBid)}`, "error")
       return
     }
 
