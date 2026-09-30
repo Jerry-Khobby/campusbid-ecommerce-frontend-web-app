@@ -63,7 +63,7 @@ export interface OrderStatusHistoryEntry {
 // reads but as plain id strings elsewhere (e.g. right after creation) — the
 // exact populated vendor shape isn't pinned down in the docs, so this stays
 // loose and callers should go through getOrderVendorName()/getOrderVendorId().
-export type OrderRef = string | { _id: string; businessName?: string; profile?: { businessName?: string; phoneNumber?: string } }
+export type OrderRef = string | null | { _id: string; businessName?: string; profile?: { businessName?: string; phoneNumber?: string } }
 
 export interface OrderItemRecord {
   productId: string | { _id: string }
@@ -97,11 +97,12 @@ export interface Order {
 }
 
 export function getOrderVendorId(order: Order): string {
+  if (!order.vendorId) return ""
   return typeof order.vendorId === "string" ? order.vendorId : order.vendorId._id
 }
 
 export function getOrderVendorName(order: Order): string {
-  if (typeof order.vendorId === "string") return "Vendor"
+  if (!order.vendorId || typeof order.vendorId === "string") return "Vendor"
   return order.vendorId.profile?.businessName ?? order.vendorId.businessName ?? "Vendor"
 }
 
