@@ -61,6 +61,7 @@ const CANCELABLE_STATUSES: OrderStatus[] = ["pending", "accepted", "preparing", 
 const DELIVERY_CODE_VISIBLE_STATUSES: OrderStatus[] = ["ready", "out_for_delivery"]
 
 function getProductId(item: OrderItemRecord): string {
+  if (!item.productId) return ""
   return typeof item.productId === "string" ? item.productId : item.productId._id
 }
 
@@ -253,8 +254,8 @@ export default function OrdersPage() {
                 <div className="space-y-4 pt-4" onClick={(e) => e.stopPropagation()}>
                   {/* Items */}
                   <div className="space-y-1">
-                    {order.items.map((item) => (
-                      <div key={getProductId(item)} className="flex justify-between text-sm">
+                    {order.items.map((item, index) => (
+                      <div key={getProductId(item) || index} className="flex justify-between text-sm">
                         <span className="text-foreground">
                           {item.productName} x{item.quantity}
                         </span>
@@ -493,10 +494,9 @@ function ReviewDialog({
         vendorId: getOrderVendorId(order),
         rating: overallRating,
         review: comment.trim() || undefined,
-        productRatings: order.items.map((item) => {
-          const productId = getProductId(item)
-          return { productId, rating: productRatings[productId] ?? 5 }
-        }),
+        productRatings: order.items
+          .map((item) => ({ productId: getProductId(item), rating: productRatings[getProductId(item)] ?? 5 }))
+          .filter((entry) => entry.productId),
       })
       addNotification("Thanks for your review!", "success")
       onSubmitted(order._id)
@@ -528,10 +528,10 @@ function ReviewDialog({
             </div>
 
             <div className="space-y-3">
-              {order.items.map((item) => {
+              {order.items.map((item, index) => {
                 const productId = getProductId(item)
                 return (
-                  <div key={productId} className="flex items-center justify-between gap-3">
+                  <div key={productId || index} className="flex items-center justify-between gap-3">
                     <span className="text-sm text-foreground">{item.productName}</span>
                     <StarRating
                       value={productRatings[productId] ?? 5}

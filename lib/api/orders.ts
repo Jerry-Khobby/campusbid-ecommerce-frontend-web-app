@@ -66,7 +66,7 @@ export interface OrderStatusHistoryEntry {
 export type OrderRef = string | null | { _id: string; businessName?: string; profile?: { businessName?: string; phoneNumber?: string } }
 
 export interface OrderItemRecord {
-  productId: string | { _id: string }
+  productId: string | null | { _id: string }
   productName: string
   productImage?: string
   quantity: number
