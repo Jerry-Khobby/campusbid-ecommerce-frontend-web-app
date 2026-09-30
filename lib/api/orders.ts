@@ -86,6 +86,7 @@ export interface Order {
   status: OrderStatus
   statusHistory: OrderStatusHistoryEntry[]
   paymentId?: string
+  deliveryCode?: string
   estimatedDeliveryTime?: string
   actualDeliveryTime?: string
   vendorNotes?: string

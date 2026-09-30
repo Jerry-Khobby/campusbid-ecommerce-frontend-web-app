@@ -12,6 +12,7 @@ import {
   XCircle,
   RotateCcw,
   Star,
+  KeyRound,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -54,6 +55,10 @@ const ORDER_STATUS_CONFIG: Record<OrderStatus, { icon: React.ReactNode; label: s
 }
 
 const CANCELABLE_STATUSES: OrderStatus[] = ["pending", "accepted", "preparing", "ready", "out_for_delivery"]
+
+// The code only means anything once there's actually a delivery in motion to
+// verify - showing it earlier or after it's been used would just be noise.
+const DELIVERY_CODE_VISIBLE_STATUSES: OrderStatus[] = ["ready", "out_for_delivery"]
 
 function getProductId(item: OrderItemRecord): string {
   return typeof item.productId === "string" ? item.productId : item.productId._id
@@ -257,6 +262,20 @@ export default function OrdersPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Delivery Code */}
+                  {order.deliveryCode && DELIVERY_CODE_VISIBLE_STATUSES.includes(order.status) && (
+                    <Card className="p-4 bg-accent/10 border border-accent/20 flex items-center gap-3">
+                      <KeyRound size={20} className="text-accent shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-accent">Delivery Code</p>
+                        <p className="text-2xl font-bold tracking-widest text-foreground">{order.deliveryCode}</p>
+                        <p className="text-xs text-accent/80">
+                          Give this to the vendor when your order arrives - don't share it before then.
+                        </p>
+                      </div>
+                    </Card>
+                  )}
 
                   {/* Timeline */}
                   <OrderTimeline history={order.statusHistory} />
