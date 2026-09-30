@@ -49,6 +49,7 @@ export default function CheckoutPage() {
   const vendorGroups = useMemo(() => groupItemsByVendor(items), [items])
   const singleVendorItems = vendorGroups.size === 1 ? [...vendorGroups.values()][0] : []
   const vendorId = singleVendorItems[0]?.vendorId ?? ""
+  const vendorName = singleVendorItems[0]?.vendor ?? ""
 
   const [step, setStep] = useState<CheckoutStep>("address")
   const [addressId, setAddressId] = useState(() => user?.addresses.find((a) => a.isDefault)?._id ?? user?.addresses[0]?._id ?? "")
@@ -210,6 +211,7 @@ export default function CheckoutPage() {
         </button>
         <div>
           <h1 className="text-3xl font-bold text-foreground">Checkout</h1>
+          <p className="text-sm text-muted-foreground">Ordering from {vendorName}</p>
         </div>
       </div>
 
