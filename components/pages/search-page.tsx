@@ -90,7 +90,7 @@ export default function SearchPage() {
       id: product._id,
       vendorId: product.vendorId,
       name: product.name,
-      vendor: product.vendorId,
+      vendor: product.vendorName ?? "Vendor",
       price: product.discountPrice ?? product.price,
       image: product.images[0] ?? "/placeholder.svg",
     })
