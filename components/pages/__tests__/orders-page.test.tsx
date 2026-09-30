@@ -78,7 +78,10 @@ describe("OrdersPage dispute flow", () => {
       expect(refundMutateAsync).toHaveBeenCalledWith({ paymentId: "pay_1", reason: "Wrong item delivered" }),
     )
     await waitFor(() =>
-      expect(addNotification).toHaveBeenCalledWith("Dispute submitted. Your payment has been refunded.", "success"),
+      expect(addNotification).toHaveBeenCalledWith(
+        "Dispute submitted. Your refund has been initiated and should reflect in a few business days.",
+        "success",
+      ),
     )
   })
 

@@ -176,7 +176,7 @@ export default function OrdersPage() {
     }
     try {
       await refundPayment.mutateAsync({ paymentId: order.paymentId, reason: disputeReason.trim() })
-      addNotification("Dispute submitted. Your payment has been refunded.", "success")
+      addNotification("Dispute submitted. Your refund has been initiated and should reflect in a few business days.", "success")
       closeAction()
     } catch (error) {
       addNotification(error instanceof ApiError ? error.message : "Could not submit this dispute.", "error")
