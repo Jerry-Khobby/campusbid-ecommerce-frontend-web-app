@@ -29,7 +29,6 @@ import {
   joinConversation,
   markConversationRead,
   sendChatMessage,
-  type MessageReadEvent,
 } from "@/lib/socket/chat-socket"
 
 const PREDEFINED_ROLE = "customer"
@@ -164,7 +163,6 @@ function useVendorSummaries(conversations: Conversation[]): Map<string, VendorSu
 
 export default function ChatPage() {
   const { user } = useUser()
-  const { addNotification } = useNotification()
   const searchParams = useSearchParams()
   const conversationIdFromUrl = searchParams.get("conversation")
 
@@ -221,7 +219,7 @@ export default function ChatPage() {
       if (message.conversationId !== selectedConversationIdRef.current) return
       setMessages((previous) => [...previous, message])
     }
-    const handleMessageRead = (_event: MessageReadEvent) => {
+    const handleMessageRead = () => {
       // Read receipts aren't surfaced in this UI yet; acknowledging the event keeps the listener list explicit.
     }
 

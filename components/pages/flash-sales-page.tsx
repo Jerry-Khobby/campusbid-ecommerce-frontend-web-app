@@ -379,7 +379,7 @@ export default function FlashSalesPage() {
 
           {isSalesError && (
             <p className="text-center text-muted-foreground py-12">
-              Couldn't load flash sales right now. Please try again later.
+              Couldn&apos;t load flash sales right now. Please try again later.
             </p>
           )}
 
@@ -406,11 +406,11 @@ export default function FlashSalesPage() {
           )}
 
           {isMyBidsError && (
-            <p className="text-center text-muted-foreground py-12">Couldn't load your bids right now.</p>
+            <p className="text-center text-muted-foreground py-12">Couldn&apos;t load your bids right now.</p>
           )}
 
           {!isMyBidsLoading && !isMyBidsError && myBids.length === 0 && (
-            <p className="text-center text-muted-foreground py-12">You haven't placed any bids yet.</p>
+            <p className="text-center text-muted-foreground py-12">You haven&apos;t placed any bids yet.</p>
           )}
 
           {!isMyBidsLoading && !isMyBidsError && myBids.length > 0 && user && (

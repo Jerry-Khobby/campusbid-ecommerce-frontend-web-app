@@ -218,7 +218,7 @@ export default function OrdersPage() {
 
       {/* Orders List */}
       <div className="space-y-4">
-        {orders?.length === 0 && <p className="text-muted-foreground">You haven't placed any orders yet.</p>}
+        {orders?.length === 0 && <p className="text-muted-foreground">You haven&apos;t placed any orders yet.</p>}
 
         {orders?.map((order) => {
           const statusConfig = ORDER_STATUS_CONFIG[order.status]
@@ -275,7 +275,7 @@ export default function OrdersPage() {
                         <p className="text-xs font-semibold text-accent">Delivery Code</p>
                         <p className="text-2xl font-bold tracking-widest text-foreground">{order.deliveryCode}</p>
                         <p className="text-xs text-accent/80">
-                          Give this to the vendor when your order arrives - don't share it before then.
+                          Give this to the vendor when your order arrives - don&apos;t share it before then.
                         </p>
                       </div>
                     </Card>
@@ -447,7 +447,7 @@ export default function OrdersPage() {
                     </Button>
                   )}
                   {order.status === "completed" && reviewedOrderIds.has(order._id) && (
-                    <p className="text-xs text-center text-muted-foreground">You've reviewed this order.</p>
+                    <p className="text-xs text-center text-muted-foreground">You&apos;ve reviewed this order.</p>
                   )}
                 </div>
               )}
