@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useNotification } from "@/lib/notification-context"
+import { useCart } from "@/lib/cart-context"
 import { ApiError } from "@/lib/api/client"
 import {
   fetchPayment,
@@ -57,6 +58,7 @@ function PaymentCallbackPageInner() {
 
 function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
   const router = useRouter()
+  const { clearCart } = useCart()
   const { addNotification } = useNotification()
   const initializePayment = useInitializePayment()
   const submitMomoOtp = useSubmitMomoOtp()
@@ -87,9 +89,16 @@ function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
 
   useEffect(() => {
     if (payment?.status === "held") {
+      // This is the actual confirmed-success moment - only here is it safe
+      // to assume the order really happened. clearCart isn't memoized in
+      // CartProvider, so it's deliberately left out of the deps below -
+      // including it would re-run this (and reset the redirect timer) on
+      // every unrelated cart re-render while this page sits on "held".
+      clearCart()
       const timer = setTimeout(() => router.push("/orders"), REDIRECT_DELAY_MS)
       return () => clearTimeout(timer)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payment?.status, router])
 
   useEffect(() => {

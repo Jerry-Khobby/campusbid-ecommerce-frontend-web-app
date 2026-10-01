@@ -39,7 +39,7 @@ function groupItemsByVendor(items: CartItem[]): Map<string, CartItem[]> {
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { items, clearCart } = useCart()
+  const { items } = useCart()
   const { user } = useUser()
   const { addNotification } = useNotification()
   const createOrder = useCreateOrder()
@@ -112,7 +112,10 @@ export default function CheckoutPage() {
       })
 
       if (payment.paymentMethod === "card") {
-        clearCart()
+        // Not confirmed yet - just redirecting to pay. Clearing the cart here
+        // would make a cancelled or failed Paystack payment look like a
+        // completed order the moment the customer comes back. The callback
+        // page clears it once the payment actually confirms as held.
         window.location.href = payment.authorizationUrl
         return
       }
@@ -125,7 +128,6 @@ export default function CheckoutPage() {
         return
       }
 
-      clearCart()
       router.push(`/payments/callback?paymentId=${payment.paymentId}`)
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Something went wrong placing your order."
@@ -138,7 +140,6 @@ export default function CheckoutPage() {
 
     try {
       await submitMomoOtp.mutateAsync({ paymentId: pendingOtpPaymentId, otp })
-      clearCart()
       router.push(`/payments/callback?paymentId=${pendingOtpPaymentId}`)
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Could not verify that code. Please try again."
