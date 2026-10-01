@@ -156,3 +156,39 @@ describe("OrdersPage status timeline", () => {
     expect(screen.queryByText("Order Timeline")).not.toBeInTheDocument()
   })
 })
+
+describe("OrdersPage cancellation", () => {
+  beforeEach(() => {
+    vi.mocked(useCancelOrder).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any)
+    vi.mocked(useConfirmDelivery).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any)
+    vi.mocked(useCreateReview).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any)
+    vi.mocked(useNotification).mockReturnValue({ addNotification: vi.fn() } as any)
+    vi.mocked(useRefundPayment).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any)
+  })
+
+  function renderOrderWithStatus(status: Order["status"]) {
+    vi.mocked(useOrders).mockReturnValue({
+      data: [{ ...DELIVERED_ORDER, status }],
+      isLoading: false,
+      isError: false,
+    } as any)
+    render(<OrdersPage />)
+    fireEvent.click(screen.getByText("Notebook"))
+  }
+
+  it.each(["pending", "accepted"] as const)("offers cancellation for a %s order", async (status) => {
+    renderOrderWithStatus(status)
+
+    expect(await screen.findByText("Cancel Order")).toBeInTheDocument()
+  })
+
+  it.each(["preparing", "ready", "out_for_delivery"] as const)(
+    "does not offer cancellation once the order is %s",
+    async (status) => {
+      renderOrderWithStatus(status)
+
+      await screen.findByText("Payment Held")
+      expect(screen.queryByText("Cancel Order")).not.toBeInTheDocument()
+    },
+  )
+})

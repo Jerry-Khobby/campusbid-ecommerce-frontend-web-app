@@ -54,7 +54,10 @@ const ORDER_STATUS_CONFIG: Record<OrderStatus, { icon: React.ReactNode; label: s
   refunded: { icon: <RotateCcw size={20} className="text-muted-foreground" />, label: "Refunded", cardClassName: "bg-muted" },
 }
 
-const CANCELABLE_STATUSES: OrderStatus[] = ["pending", "accepted", "preparing", "ready", "out_for_delivery"]
+// The backend only lets customers cancel before the vendor starts preparing;
+// from then until delivery is confirmed the payment is still held in escrow.
+const CANCELABLE_STATUSES: OrderStatus[] = ["pending", "accepted"]
+const PAYMENT_HELD_STATUSES: OrderStatus[] = ["pending", "accepted", "preparing", "ready", "out_for_delivery"]
 
 // The code only means anything once there's actually a delivery in motion to
 // verify - showing it earlier or after it's been used would just be noise.
@@ -319,7 +322,7 @@ export default function OrdersPage() {
                   )}
 
                   {/* Escrow notice */}
-                  {CANCELABLE_STATUSES.includes(order.status) && (
+                  {PAYMENT_HELD_STATUSES.includes(order.status) && (
                     <Card className="p-3 bg-accent/10 border border-accent/20 flex-row items-start gap-2">
                       <AlertCircle size={16} className="text-accent shrink-0 mt-0.5" />
                       <div>
