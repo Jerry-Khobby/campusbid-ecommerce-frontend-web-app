@@ -15,14 +15,11 @@ export type OrderStatus =
   | "cancelled"
   | "refunded"
 
+// The backend prices each item from its product catalogue, so only the
+// product and quantity are sent.
 export interface OrderItemInput {
   productId: string
-  productName: string
-  productImage?: string
   quantity: number
-  price: number
-  isFlashSale?: boolean
-  flashSaleId?: string
 }
 
 export interface OrderPricing {
@@ -48,7 +45,6 @@ export interface DeliveryAddressInput {
 export interface CreateOrderInput {
   vendorId: string
   items: OrderItemInput[]
-  pricing: OrderPricing
   deliveryAddress: DeliveryAddressInput
   customerNotes?: string
 }

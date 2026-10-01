@@ -84,14 +84,7 @@ export default function CheckoutPage() {
       if (!currentOrderId) {
         const order = await createOrder.mutateAsync({
           vendorId,
-          items: singleVendorItems.map((item) => ({
-            productId: item.id,
-            productName: item.name,
-            productImage: item.image,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-          pricing: { subtotal, deliveryFee: DELIVERY_FEE, serviceFee: SERVICE_FEE, total },
+          items: singleVendorItems.map((item) => ({ productId: item.id, quantity: item.quantity })),
           deliveryAddress: {
             label: selectedAddress.label,
             building: selectedAddress.building,
