@@ -13,6 +13,14 @@ export default function GoogleCallbackPage() {
   const { addNotification } = useNotification()
 
   useEffect(() => {
+    // The backend redirects here with ?error= when it refuses the sign-in, e.g. for a suspended account.
+    const error = searchParams.get("error")
+    if (error) {
+      addNotification(error, "error")
+      router.replace("/login")
+      return
+    }
+
     const accessToken = searchParams.get("accessToken")
     const refreshToken = searchParams.get("refreshToken")
 
