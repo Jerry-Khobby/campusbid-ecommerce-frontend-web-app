@@ -20,6 +20,7 @@ import {
   fetchMyBids,
   flashSaleQueryKey,
   getMinimumBidAmount,
+  isStaleBidError,
   myBidsQueryKey,
   placeBid,
   type FlashSale,
@@ -302,7 +303,11 @@ export default function FlashSalesPage() {
       addNotification(`Bid of ${formatCurrency(updatedSale.currentBid ?? 0)} placed successfully!`, "success")
       setBidAmount(getMinimumBidAmount(updatedSale).toString())
     },
-    onError: (error) => {
+    onError: (error, { id }) => {
+      if (isStaleBidError(error)) {
+        queryClient.invalidateQueries({ queryKey: activeFlashSalesQueryKey })
+        queryClient.invalidateQueries({ queryKey: flashSaleQueryKey(id) })
+      }
       addNotification(getErrorMessage(error), "error")
     },
   })
