@@ -18,17 +18,15 @@ export interface LoginInput {
   password: string
 }
 
-// Registration only sends the two required fields. `profile`/`addresses`/etc.
-// are accepted by the backend's CreateUserDto but are all optional there —
-// completing them goes through PUT /users/profile after registration, which
+// Registration only sends the two required fields. `profile`/`addresses` are
+// accepted by the backend's CreateUserDto but are optional there — completing
+// them goes through PUT /users/profile after registration, which
 // avoids relying on multipart form-data's uncertain handling of nested JSON
 // fields for a case where it isn't needed.
 export async function registerUser(input: RegisterInput): Promise<AuthResult> {
   const formData = new FormData()
   formData.append("email", input.email)
   formData.append("password", input.password)
-  // Required by CreateUserDto's validation but not read by the handler (see docs/users.md).
-  formData.append("refreshToken", "n/a")
 
   const json = await apiUpload<{ user: SafeUser; accessToken: string; refreshToken: string }>(
     "/users/register",
@@ -62,9 +60,6 @@ export async function fetchCurrentUser(): Promise<SafeUser> {
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  // The backend's response also includes a raw resetToken (a known,
-  // documented placeholder-for-production quirk) — intentionally ignored
-  // here since the real reset link is meant to arrive by email.
   await apiFetch("/users/forgot-password", { method: "POST", body: { email }, auth: false })
 }
 
