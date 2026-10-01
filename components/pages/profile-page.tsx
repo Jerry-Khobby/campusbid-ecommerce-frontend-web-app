@@ -34,17 +34,16 @@ import { useNotification } from "@/lib/notification-context"
 import { fetchProduct, type Product } from "@/lib/api/products"
 import type { Address, PaymentMethodRecord, SafeUser } from "@/lib/api/types"
 import {
-  addAddress,
   addPaymentMethod,
-  deleteAddress,
   deletePaymentMethod,
-  fetchAddresses,
   fetchPaymentMethods,
-  updateAddress,
   updateProfile,
   uploadProfileImage,
+  useAddAddress,
+  useAddresses,
+  useDeleteAddress,
+  useUpdateAddress,
   type AddressInput,
-  type AddressUpdateInput,
   type PaymentMethodInput,
   type ProfileUpdateInput,
 } from "@/lib/api/users"
@@ -52,7 +51,6 @@ import { NotificationsPanel } from "@/components/notifications-panel"
 
 type TabId = "profile" | "addresses" | "payment" | "saved" | "notifications" | "settings"
 
-const ADDRESSES_QUERY_KEY = ["addresses"] as const
 const PAYMENT_METHODS_QUERY_KEY = ["payment-methods"] as const
 
 const TAB_CONFIG: { id: TabId; label: string; icon: LucideIcon }[] = [
@@ -371,47 +369,26 @@ interface AddressFormValues {
 
 function AddressesSection() {
   const { addNotification } = useNotification()
-  const queryClient = useQueryClient()
   const [isAddingAddress, setIsAddingAddress] = useState(false)
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
 
-  const addressesQuery = useQuery({ queryKey: ADDRESSES_QUERY_KEY, queryFn: fetchAddresses })
-
-  const addAddressMutation = useMutation({
-    mutationFn: addAddress,
-    onSuccess: (addresses) => {
-      queryClient.setQueryData(ADDRESSES_QUERY_KEY, addresses)
-      setIsAddingAddress(false)
-      addNotification("Address added", "success")
-    },
-    onError: (error) => addNotification(getErrorMessage(error, "Failed to add address"), "error"),
-  })
-
-  const updateAddressMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: AddressUpdateInput }) => updateAddress(id, data),
-    onSuccess: (addresses) => {
-      queryClient.setQueryData(ADDRESSES_QUERY_KEY, addresses)
-      setEditingAddressId(null)
-      addNotification("Address updated", "success")
-    },
-    onError: (error) => addNotification(getErrorMessage(error, "Failed to update address"), "error"),
-  })
-
-  const deleteAddressMutation = useMutation({
-    mutationFn: deleteAddress,
-    onSuccess: (addresses) => {
-      queryClient.setQueryData(ADDRESSES_QUERY_KEY, addresses)
-      addNotification("Address deleted", "info")
-    },
-    onError: (error) => addNotification(getErrorMessage(error, "Failed to delete address"), "error"),
-  })
+  const addressesQuery = useAddresses()
+  const addAddressMutation = useAddAddress()
+  const updateAddressMutation = useUpdateAddress()
+  const deleteAddressMutation = useDeleteAddress()
 
   const handleAddAddress = (values: AddressFormValues) => {
     if (!isValidAddressForm(values)) {
       addNotification("Please provide a label and valid coordinates", "error")
       return
     }
-    addAddressMutation.mutate(toAddressInput(values))
+    addAddressMutation.mutate(toAddressInput(values), {
+      onSuccess: () => {
+        setIsAddingAddress(false)
+        addNotification("Address added", "success")
+      },
+      onError: (error) => addNotification(getErrorMessage(error, "Failed to add address"), "error"),
+    })
   }
 
   const handleUpdateAddress = (id: string, values: AddressFormValues) => {
@@ -419,7 +396,23 @@ function AddressesSection() {
       addNotification("Please provide a label and valid coordinates", "error")
       return
     }
-    updateAddressMutation.mutate({ id, data: toAddressInput(values) })
+    updateAddressMutation.mutate(
+      { id, data: toAddressInput(values) },
+      {
+        onSuccess: () => {
+          setEditingAddressId(null)
+          addNotification("Address updated", "success")
+        },
+        onError: (error) => addNotification(getErrorMessage(error, "Failed to update address"), "error"),
+      },
+    )
+  }
+
+  const handleDeleteAddress = (id: string) => {
+    deleteAddressMutation.mutate(id, {
+      onSuccess: () => addNotification("Address deleted", "info"),
+      onError: (error) => addNotification(getErrorMessage(error, "Failed to delete address"), "error"),
+    })
   }
 
   if (addressesQuery.isLoading) return <LoadingCard label="Loading addresses..." />
@@ -443,7 +436,7 @@ function AddressesSection() {
             key={address._id}
             address={address}
             onEdit={() => setEditingAddressId(address._id)}
-            onDelete={() => deleteAddressMutation.mutate(address._id)}
+            onDelete={() => handleDeleteAddress(address._id)}
             isDeleting={deleteAddressMutation.isPending && deleteAddressMutation.variables === address._id}
           />
         ),

@@ -24,6 +24,7 @@ import {
 } from "@/lib/api/payments"
 import { DELIVERY_FEE, SERVICE_FEE } from "@/lib/constants"
 import { formatCurrency } from "@/lib/format"
+import { resolveDeliveryAddress } from "@/lib/delivery-address"
 
 type CheckoutStep = "address" | "payment"
 
@@ -52,7 +53,7 @@ export default function CheckoutPage() {
   const vendorName = singleVendorItems[0]?.vendor ?? ""
 
   const [step, setStep] = useState<CheckoutStep>("address")
-  const [addressId, setAddressId] = useState(() => user?.addresses.find((a) => a.isDefault)?._id ?? user?.addresses[0]?._id ?? "")
+  const [chosenAddressId, setChosenAddressId] = useState("")
   const [customerNotes, setCustomerNotes] = useState("")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   const [momoProvider, setMomoProvider] = useState<MomoProvider>("mtn")
@@ -64,7 +65,7 @@ export default function CheckoutPage() {
   const [pendingOtpPaymentId, setPendingOtpPaymentId] = useState<string | null>(null)
   const [otp, setOtp] = useState("")
 
-  const selectedAddress = user?.addresses.find((a) => a._id === addressId)
+  const selectedAddress = resolveDeliveryAddress(user?.addresses ?? [], chosenAddressId)
   const subtotal = singleVendorItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const total = subtotal + DELIVERY_FEE + SERVICE_FEE
   const isPlacingOrder = createOrder.isPending || initializePayment.isPending || submitMomoOtp.isPending
@@ -220,7 +221,7 @@ export default function CheckoutPage() {
         <div className="space-y-4 mb-8">
           <Card className="p-6">
             <h2 className="text-xl font-bold text-foreground mb-4">Delivery Address</h2>
-            <RadioGroup value={addressId} onValueChange={setAddressId} className="space-y-3">
+            <RadioGroup value={selectedAddress?._id ?? ""} onValueChange={setChosenAddressId} className="space-y-3">
               {user.addresses.map((address) => (
                 <Label
                   key={address._id}
