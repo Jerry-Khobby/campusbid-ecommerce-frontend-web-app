@@ -270,8 +270,6 @@ export default function ChatPage() {
 
     sendChatMessage(socket, {
       conversationId: selectedConversationId,
-      senderId: user._id,
-      senderType: "customer",
       messageType: "predefined",
       content: predefined.text,
       predefinedMessageId: predefined._id,
@@ -285,8 +283,6 @@ export default function ChatPage() {
 
     sendChatMessage(socket, {
       conversationId: selectedConversationId,
-      senderId: user._id,
-      senderType: "customer",
       messageType: "text",
       content,
     })
