@@ -68,6 +68,31 @@ const DISPUTE_REASON_MIN_LENGTH = 10
 // verify - showing it earlier or after it's been used would just be noise.
 const DELIVERY_CODE_VISIBLE_STATUSES: OrderStatus[] = ["ready", "out_for_delivery"]
 
+// Finished orders a customer has no more action to take on - safe to let them
+// clear from their own list. This never touches the order record itself
+// (still exists for the vendor, payment history, disputes, etc.), it only
+// hides it from this customer's view going forward.
+const CLEARABLE_STATUSES: OrderStatus[] = ["completed", "cancelled", "refunded"]
+const DISMISSED_ORDERS_STORAGE_KEY = "campusbid.dismissedOrderIds"
+
+function loadDismissedOrderIds(): Set<string> {
+  if (typeof window === "undefined") return new Set()
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_ORDERS_STORAGE_KEY)
+    return new Set(raw ? (JSON.parse(raw) as string[]) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function saveDismissedOrderIds(ids: Set<string>): void {
+  try {
+    window.localStorage.setItem(DISMISSED_ORDERS_STORAGE_KEY, JSON.stringify([...ids]))
+  } catch {
+    // Best-effort only - a full/blocked localStorage just means the order reappears next visit.
+  }
+}
+
 function getProductId(item: OrderItemRecord): string {
   if (!item.productId) return ""
   return typeof item.productId === "string" ? item.productId : item.productId._id
@@ -142,6 +167,18 @@ export default function OrdersPage() {
   const [disputeReason, setDisputeReason] = useState("")
   const [reviewOrder, setReviewOrder] = useState<Order | null>(null)
   const [reviewedOrderIds, setReviewedOrderIds] = useState<Set<string>>(new Set())
+  const [dismissedOrderIds, setDismissedOrderIds] = useState<Set<string>>(() => loadDismissedOrderIds())
+
+  const handleClearOrder = (orderId: string) => {
+    setDismissedOrderIds((prev) => {
+      const next = new Set(prev).add(orderId)
+      saveDismissedOrderIds(next)
+      return next
+    })
+    addNotification("Removed from your order list.", "success")
+  }
+
+  const visibleOrders = orders?.filter((order) => !dismissedOrderIds.has(order._id))
 
   const closeAction = () => {
     setActiveAction(null)
@@ -223,8 +260,11 @@ export default function OrdersPage() {
       {/* Orders List */}
       <div className="space-y-4">
         {orders?.length === 0 && <p className="text-muted-foreground">You haven&apos;t placed any orders yet.</p>}
+        {orders && orders.length > 0 && visibleOrders?.length === 0 && (
+          <p className="text-muted-foreground">You&apos;ve cleared all your orders.</p>
+        )}
 
-        {orders?.map((order) => {
+        {visibleOrders?.map((order) => {
           const statusConfig = ORDER_STATUS_CONFIG[order.status]
           const isExpanded = expandedOrder === order._id
           const isActionOnThisOrder = activeAction?.orderId === order._id
@@ -255,6 +295,16 @@ export default function OrdersPage() {
                 {statusConfig.icon}
                 <span className="text-sm font-medium text-foreground">{statusConfig.label}</span>
               </div>
+
+              {/* Delivery code hint - the only cue a customer gets that there's a
+                  code to find before they expand the card, since the code itself
+                  only renders in the expanded section below. */}
+              {!isExpanded && order.deliveryCode && DELIVERY_CODE_VISIBLE_STATUSES.includes(order.status) && (
+                <div className="flex items-center gap-2 pt-3 text-sm font-medium text-accent">
+                  <KeyRound size={16} />
+                  <span>Tap to view your delivery code</span>
+                </div>
+              )}
 
               {/* Expanded Details */}
               {isExpanded && (
@@ -454,6 +504,17 @@ export default function OrdersPage() {
                   )}
                   {order.status === "completed" && reviewedOrderIds.has(order._id) && (
                     <p className="text-xs text-center text-muted-foreground">You&apos;ve reviewed this order.</p>
+                  )}
+
+                  {/* Clear action - only for orders with nothing left to do */}
+                  {CLEARABLE_STATUSES.includes(order.status) && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleClearOrder(order._id)}
+                      className="w-full text-muted-foreground hover:text-destructive"
+                    >
+                      Clear from my list
+                    </Button>
                   )}
                 </div>
               )}
