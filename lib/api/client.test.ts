@@ -19,6 +19,7 @@ async function errorFrom(path: string): Promise<ApiError> {
 describe("apiFetch error messages", () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
   it("tells the user how many minutes to wait when rate limited", async () => {
@@ -37,6 +38,21 @@ describe("apiFetch error messages", () => {
     respondWith(TOO_MANY_REQUESTS)
 
     expect((await errorFrom("/users/login")).message).toBe("Too many attempts. Please wait a few minutes and try again.")
+  })
+
+  it("replaces a list of field validation errors with a plain message", async () => {
+    respondWith(400, {}, { message: ["property pricing should not exist", "items.0.property price should not exist"] })
+
+    expect((await errorFrom("/orders/create")).message).toBe(
+      "We couldn't process this request. Please refresh the page and try again.",
+    )
+  })
+
+  it("keeps the field validation errors on the error for debugging", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined)
+    respondWith(400, {}, { message: ["property pricing should not exist"] })
+
+    expect((await errorFrom("/orders/create")).details).toEqual(["property pricing should not exist"])
   })
 
   it("keeps the backend's message for other errors", async () => {
