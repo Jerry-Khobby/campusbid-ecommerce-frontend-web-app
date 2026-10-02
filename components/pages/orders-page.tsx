@@ -13,6 +13,8 @@ import {
   RotateCcw,
   Star,
   KeyRound,
+  ChevronDown,
+  ChevronUp,
   ShieldAlert,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
@@ -67,6 +69,21 @@ const DISPUTE_REASON_MIN_LENGTH = 10
 // The code only means anything once there's actually a delivery in motion to
 // verify - showing it earlier or after it's been used would just be noise.
 const DELIVERY_CODE_VISIBLE_STATUSES: OrderStatus[] = ["ready", "out_for_delivery"]
+
+// One line per status telling the customer what is happening and what, if
+// anything, they need to do - shown on every card without expanding it.
+const CUSTOMER_NEXT_STEPS: Record<OrderStatus, string> = {
+  pending: "Waiting for the vendor to accept your order. You can still cancel it.",
+  accepted: "The vendor accepted your order and will start preparing it soon. You can still cancel it.",
+  preparing: "The vendor is preparing your order.",
+  ready: "Your order is ready and will be sent out soon. Keep your delivery code handy.",
+  out_for_delivery: "Your order is on its way. Give the vendor your delivery code when it arrives.",
+  delivered: "Check your order, then confirm delivery to release the payment - or report a problem.",
+  disputed: "We're reviewing the problem you reported. Open the order to see where it stands.",
+  completed: "All done. You can rate this order.",
+  cancelled: "This order was cancelled.",
+  refunded: "Your payment for this order was refunded.",
+}
 
 // Finished orders a customer has no more action to take on - safe to let them
 // clear from their own list. This never touches the order record itself
@@ -290,20 +307,34 @@ export default function OrdersPage() {
                 </div>
               </div>
 
-              {/* Status */}
-              <div className="flex items-center gap-2 pb-4 border-b border-border">
-                {statusConfig.icon}
-                <span className="text-sm font-medium text-foreground">{statusConfig.label}</span>
+              {/* Status and what to do next */}
+              <div className="pb-4 border-b border-border space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {statusConfig.icon}
+                    <span className="text-sm font-medium text-foreground">{statusConfig.label}</span>
+                  </div>
+                  <span className="flex items-center gap-1 text-xs font-medium text-accent">
+                    {isExpanded ? "Hide details" : "Show details"}
+                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">{CUSTOMER_NEXT_STEPS[order.status]}</p>
               </div>
 
-              {/* Delivery code hint - the only cue a customer gets that there's a
-                  code to find before they expand the card, since the code itself
-                  only renders in the expanded section below. */}
-              {!isExpanded && order.deliveryCode && DELIVERY_CODE_VISIBLE_STATUSES.includes(order.status) && (
-                <div className="flex items-center gap-2 pt-3 text-sm font-medium text-accent">
-                  <KeyRound size={16} />
-                  <span>Tap to view your delivery code</span>
-                </div>
+              {/* Delivery code - shown on the card itself, so the customer never
+                  has to know to expand it. */}
+              {order.deliveryCode && DELIVERY_CODE_VISIBLE_STATUSES.includes(order.status) && (
+                <Card className="mt-4 p-4 bg-accent/10 border border-accent/20 flex-row items-center gap-3">
+                  <KeyRound size={20} className="text-accent shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-accent">Your delivery code</p>
+                    <p className="text-2xl font-bold tracking-widest text-foreground">{order.deliveryCode}</p>
+                    <p className="text-xs text-accent/80">
+                      Give this to the vendor when your order arrives - don&apos;t share it before then.
+                    </p>
+                  </div>
+                </Card>
               )}
 
               {/* Expanded Details */}
@@ -320,20 +351,6 @@ export default function OrdersPage() {
                       </div>
                     ))}
                   </div>
-
-                  {/* Delivery Code */}
-                  {order.deliveryCode && DELIVERY_CODE_VISIBLE_STATUSES.includes(order.status) && (
-                    <Card className="p-4 bg-accent/10 border border-accent/20 flex items-center gap-3">
-                      <KeyRound size={20} className="text-accent shrink-0" />
-                      <div>
-                        <p className="text-xs font-semibold text-accent">Delivery Code</p>
-                        <p className="text-2xl font-bold tracking-widest text-foreground">{order.deliveryCode}</p>
-                        <p className="text-xs text-accent/80">
-                          Give this to the vendor when your order arrives - don&apos;t share it before then.
-                        </p>
-                      </div>
-                    </Card>
-                  )}
 
                   {/* Timeline */}
                   <OrderTimeline history={order.statusHistory} />
