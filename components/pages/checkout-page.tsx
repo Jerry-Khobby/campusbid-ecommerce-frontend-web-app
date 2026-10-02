@@ -24,6 +24,7 @@ import {
 } from "@/lib/api/payments"
 import { DELIVERY_FEE, SERVICE_FEE } from "@/lib/constants"
 import { formatCurrency } from "@/lib/format"
+import { resolveDeliveryAddress } from "@/lib/delivery-address"
 
 type CheckoutStep = "address" | "payment"
 
@@ -39,7 +40,7 @@ function groupItemsByVendor(items: CartItem[]): Map<string, CartItem[]> {
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { items, clearCart } = useCart()
+  const { items } = useCart()
   const { user } = useUser()
   const { addNotification } = useNotification()
   const createOrder = useCreateOrder()
@@ -49,9 +50,10 @@ export default function CheckoutPage() {
   const vendorGroups = useMemo(() => groupItemsByVendor(items), [items])
   const singleVendorItems = vendorGroups.size === 1 ? [...vendorGroups.values()][0] : []
   const vendorId = singleVendorItems[0]?.vendorId ?? ""
+  const vendorName = singleVendorItems[0]?.vendor ?? ""
 
   const [step, setStep] = useState<CheckoutStep>("address")
-  const [addressId, setAddressId] = useState(() => user?.addresses.find((a) => a.isDefault)?._id ?? user?.addresses[0]?._id ?? "")
+  const [chosenAddressId, setChosenAddressId] = useState("")
   const [customerNotes, setCustomerNotes] = useState("")
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card")
   const [momoProvider, setMomoProvider] = useState<MomoProvider>("mtn")
@@ -63,7 +65,7 @@ export default function CheckoutPage() {
   const [pendingOtpPaymentId, setPendingOtpPaymentId] = useState<string | null>(null)
   const [otp, setOtp] = useState("")
 
-  const selectedAddress = user?.addresses.find((a) => a._id === addressId)
+  const selectedAddress = resolveDeliveryAddress(user?.addresses ?? [], chosenAddressId)
   const subtotal = singleVendorItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const total = subtotal + DELIVERY_FEE + SERVICE_FEE
   const isPlacingOrder = createOrder.isPending || initializePayment.isPending || submitMomoOtp.isPending
@@ -83,14 +85,7 @@ export default function CheckoutPage() {
       if (!currentOrderId) {
         const order = await createOrder.mutateAsync({
           vendorId,
-          items: singleVendorItems.map((item) => ({
-            productId: item.id,
-            productName: item.name,
-            productImage: item.image,
-            quantity: item.quantity,
-            price: item.price,
-          })),
-          pricing: { subtotal, deliveryFee: DELIVERY_FEE, serviceFee: SERVICE_FEE, total },
+          items: singleVendorItems.map((item) => ({ productId: item.id, quantity: item.quantity })),
           deliveryAddress: {
             label: selectedAddress.label,
             building: selectedAddress.building,
@@ -111,7 +106,10 @@ export default function CheckoutPage() {
       })
 
       if (payment.paymentMethod === "card") {
-        clearCart()
+        // Not confirmed yet - just redirecting to pay. Clearing the cart here
+        // would make a cancelled or failed Paystack payment look like a
+        // completed order the moment the customer comes back. The callback
+        // page clears it once the payment actually confirms as held.
         window.location.href = payment.authorizationUrl
         return
       }
@@ -124,7 +122,6 @@ export default function CheckoutPage() {
         return
       }
 
-      clearCart()
       router.push(`/payments/callback?paymentId=${payment.paymentId}`)
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Something went wrong placing your order."
@@ -137,7 +134,6 @@ export default function CheckoutPage() {
 
     try {
       await submitMomoOtp.mutateAsync({ paymentId: pendingOtpPaymentId, otp })
-      clearCart()
       router.push(`/payments/callback?paymentId=${pendingOtpPaymentId}`)
     } catch (error) {
       const message = error instanceof ApiError ? error.message : "Could not verify that code. Please try again."
@@ -210,6 +206,7 @@ export default function CheckoutPage() {
         </button>
         <div>
           <h1 className="text-3xl font-bold text-foreground">Checkout</h1>
+          <p className="text-sm text-muted-foreground">Ordering from {vendorName}</p>
         </div>
       </div>
 
@@ -224,7 +221,7 @@ export default function CheckoutPage() {
         <div className="space-y-4 mb-8">
           <Card className="p-6">
             <h2 className="text-xl font-bold text-foreground mb-4">Delivery Address</h2>
-            <RadioGroup value={addressId} onValueChange={setAddressId} className="space-y-3">
+            <RadioGroup value={selectedAddress?._id ?? ""} onValueChange={setChosenAddressId} className="space-y-3">
               {user.addresses.map((address) => (
                 <Label
                   key={address._id}

@@ -13,6 +13,7 @@ export interface ProductRating {
 export interface Product {
   _id: string
   vendorId: string
+  vendorName?: string
   name: string
   description?: string
   category: string

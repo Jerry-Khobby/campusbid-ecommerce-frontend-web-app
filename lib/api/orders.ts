@@ -11,18 +11,16 @@ export type OrderStatus =
   | "ready"
   | "out_for_delivery"
   | "delivered"
+  | "disputed"
   | "completed"
   | "cancelled"
   | "refunded"
 
+// The backend prices each item from its product catalogue, so only the
+// product and quantity are sent.
 export interface OrderItemInput {
   productId: string
-  productName: string
-  productImage?: string
   quantity: number
-  price: number
-  isFlashSale?: boolean
-  flashSaleId?: string
 }
 
 export interface OrderPricing {
@@ -48,7 +46,6 @@ export interface DeliveryAddressInput {
 export interface CreateOrderInput {
   vendorId: string
   items: OrderItemInput[]
-  pricing: OrderPricing
   deliveryAddress: DeliveryAddressInput
   customerNotes?: string
 }
@@ -63,16 +60,26 @@ export interface OrderStatusHistoryEntry {
 // reads but as plain id strings elsewhere (e.g. right after creation) — the
 // exact populated vendor shape isn't pinned down in the docs, so this stays
 // loose and callers should go through getOrderVendorName()/getOrderVendorId().
-export type OrderRef = string | { _id: string; businessName?: string; profile?: { businessName?: string; phoneNumber?: string } }
+export type OrderRef = string | null | { _id: string; businessName?: string; profile?: { businessName?: string; phoneNumber?: string } }
 
 export interface OrderItemRecord {
-  productId: string | { _id: string }
+  productId: string | null | { _id: string }
   productName: string
   productImage?: string
   quantity: number
   price: number
   isFlashSale: boolean
   flashSaleId?: string
+}
+
+// Opened by the customer on a delivered order; the payment stays held until an
+// admin refunds it or releases it to the vendor.
+export interface OrderDispute {
+  reason: string
+  openedAt: string
+  resolution?: "refund" | "release"
+  resolutionNote?: string
+  resolvedAt?: string
 }
 
 export interface Order {
@@ -86,22 +93,25 @@ export interface Order {
   status: OrderStatus
   statusHistory: OrderStatusHistoryEntry[]
   paymentId?: string
+  deliveryCode?: string
   estimatedDeliveryTime?: string
   actualDeliveryTime?: string
   vendorNotes?: string
   customerNotes?: string
   cancellationReason?: string
+  dispute?: OrderDispute
   rating?: { score: number; review?: string; createdAt: string }
   createdAt: string
   updatedAt: string
 }
 
 export function getOrderVendorId(order: Order): string {
+  if (!order.vendorId) return ""
   return typeof order.vendorId === "string" ? order.vendorId : order.vendorId._id
 }
 
 export function getOrderVendorName(order: Order): string {
-  if (typeof order.vendorId === "string") return "Vendor"
+  if (!order.vendorId || typeof order.vendorId === "string") return "Vendor"
   return order.vendorId.profile?.businessName ?? order.vendorId.businessName ?? "Vendor"
 }
 
@@ -132,6 +142,11 @@ async function cancelOrder(id: string, cancellationReason: string): Promise<Orde
     method: "POST",
     body: { cancellationReason },
   })
+  return json.data
+}
+
+async function openOrderDispute(id: string, reason: string): Promise<Order> {
+  const json = await apiFetch<OrderEnvelope>(`/orders/${id}/dispute`, { method: "POST", body: { reason } })
   return json.data
 }
 
@@ -167,6 +182,14 @@ export function useCancelOrder() {
   return useMutation({
     mutationFn: ({ id, cancellationReason }: { id: string; cancellationReason: string }) =>
       cancelOrder(id, cancellationReason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ordersQueryKey }),
+  })
+}
+
+export function useOpenDispute() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => openOrderDispute(id, reason),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ordersQueryKey }),
   })
 }

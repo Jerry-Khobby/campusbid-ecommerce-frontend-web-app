@@ -11,7 +11,7 @@ import { useUser } from "@/lib/user-context"
 import { useNotification } from "@/lib/notification-context"
 import { useRequireLoginAction } from "@/hooks/use-require-login-action"
 import { apiFetch } from "@/lib/api/client"
-import { fetchProduct, fetchProducts, type Product } from "@/lib/api/products"
+import { fetchProduct, fetchProducts } from "@/lib/api/products"
 import { startConversation } from "@/lib/api/chat"
 import { useVendorReviews, type VendorReview } from "@/lib/api/reviews"
 import { OptimizedImage } from "@/components/optimized-image"
@@ -286,7 +286,7 @@ function VendorSummaryCard({ vendorQuery }: { vendorQuery: ReturnType<typeof use
   if (vendorQuery.isError || !vendorQuery.data) {
     return (
       <Card className="p-4 mb-6 bg-muted/50">
-        <p className="text-sm text-muted-foreground">Vendor details couldn't be loaded.</p>
+        <p className="text-sm text-muted-foreground">Vendor details couldn&apos;t be loaded.</p>
       </Card>
     )
   }

@@ -1,4 +1,6 @@
-import { apiFetch } from "./client"
+import { ApiError, apiFetch } from "./client"
+
+const CONFLICT = 409
 
 export type FlashSaleStatus = "upcoming" | "active" | "completed" | "cancelled"
 export type FlashSaleReason = "closing_time" | "expiring_stock"
@@ -58,6 +60,12 @@ export interface FlashSaleWithBidStatus extends FlashSale {
 }
 
 /** The lowest amount `placeBid` will currently accept for this sale. */
+// A 409 means another bid landed (or the sale closed) between loading the
+// sale and bidding, so the price the bidder saw is no longer current.
+export function isStaleBidError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === CONFLICT
+}
+
 export function getMinimumBidAmount(flashSale: FlashSale): number {
   return Math.max(flashSale.currentBid ?? 0, flashSale.startingBid) + flashSale.minimumBidIncrement
 }

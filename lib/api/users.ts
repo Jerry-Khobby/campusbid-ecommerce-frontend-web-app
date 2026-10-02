@@ -1,3 +1,5 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useUser } from "../user-context"
 import { apiFetch, apiUpload } from "./client"
 import type { Address, PaymentMethodRecord, SafeUser } from "./types"
 
@@ -71,6 +73,42 @@ export async function deleteAddress(id: string): Promise<Address[]> {
     method: "DELETE",
   })
   return json.addresses
+}
+
+export const addressesQueryKey = ["addresses"] as const
+
+export function useAddresses() {
+  return useQuery({ queryKey: addressesQueryKey, queryFn: fetchAddresses })
+}
+
+export function useAddAddress() {
+  const syncAddresses = useSyncAddresses()
+  return useMutation({ mutationFn: addAddress, onSuccess: syncAddresses })
+}
+
+export function useUpdateAddress() {
+  const syncAddresses = useSyncAddresses()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: AddressUpdateInput }) => updateAddress(id, data),
+    onSuccess: syncAddresses,
+  })
+}
+
+export function useDeleteAddress() {
+  const syncAddresses = useSyncAddresses()
+  return useMutation({ mutationFn: deleteAddress, onSuccess: syncAddresses })
+}
+
+// Checkout reads addresses from the signed-in user rather than this query, so
+// both copies must be refreshed together or checkout keeps a stale list.
+function useSyncAddresses() {
+  const queryClient = useQueryClient()
+  const { refetchUser } = useUser()
+
+  return async (addresses: Address[]) => {
+    queryClient.setQueryData(addressesQueryKey, addresses)
+    await refetchUser()
+  }
 }
 
 export async function fetchPaymentMethods(): Promise<PaymentMethodRecord[]> {

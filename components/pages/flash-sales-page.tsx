@@ -20,6 +20,7 @@ import {
   fetchMyBids,
   flashSaleQueryKey,
   getMinimumBidAmount,
+  isStaleBidError,
   myBidsQueryKey,
   placeBid,
   type FlashSale,
@@ -302,7 +303,11 @@ export default function FlashSalesPage() {
       addNotification(`Bid of ${formatCurrency(updatedSale.currentBid ?? 0)} placed successfully!`, "success")
       setBidAmount(getMinimumBidAmount(updatedSale).toString())
     },
-    onError: (error) => {
+    onError: (error, { id }) => {
+      if (isStaleBidError(error)) {
+        queryClient.invalidateQueries({ queryKey: activeFlashSalesQueryKey })
+        queryClient.invalidateQueries({ queryKey: flashSaleQueryKey(id) })
+      }
       addNotification(getErrorMessage(error), "error")
     },
   })
@@ -374,7 +379,7 @@ export default function FlashSalesPage() {
 
           {isSalesError && (
             <p className="text-center text-muted-foreground py-12">
-              Couldn't load flash sales right now. Please try again later.
+              Couldn&apos;t load flash sales right now. Please try again later.
             </p>
           )}
 
@@ -401,11 +406,11 @@ export default function FlashSalesPage() {
           )}
 
           {isMyBidsError && (
-            <p className="text-center text-muted-foreground py-12">Couldn't load your bids right now.</p>
+            <p className="text-center text-muted-foreground py-12">Couldn&apos;t load your bids right now.</p>
           )}
 
           {!isMyBidsLoading && !isMyBidsError && myBids.length === 0 && (
-            <p className="text-center text-muted-foreground py-12">You haven't placed any bids yet.</p>
+            <p className="text-center text-muted-foreground py-12">You haven&apos;t placed any bids yet.</p>
           )}
 
           {!isMyBidsLoading && !isMyBidsError && myBids.length > 0 && user && (

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useNotification } from "@/lib/notification-context"
+import { useCart } from "@/lib/cart-context"
 import { ApiError } from "@/lib/api/client"
 import {
   fetchPayment,
@@ -44,7 +45,7 @@ function PaymentCallbackPageInner() {
       <CallbackShell>
         <XCircle size={48} className="text-destructive mx-auto mb-4" />
         <h1 className="text-xl font-bold text-foreground mb-2">Missing payment reference</h1>
-        <p className="text-muted-foreground mb-6">We couldn't tell which payment this was for.</p>
+        <p className="text-muted-foreground mb-6">We couldn&apos;t tell which payment this was for.</p>
         <Button onClick={() => router.push("/orders")} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
           Go to Orders
         </Button>
@@ -57,6 +58,7 @@ function PaymentCallbackPageInner() {
 
 function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
   const router = useRouter()
+  const { clearCart } = useCart()
   const { addNotification } = useNotification()
   const initializePayment = useInitializePayment()
   const submitMomoOtp = useSubmitMomoOtp()
@@ -87,9 +89,16 @@ function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
 
   useEffect(() => {
     if (payment?.status === "held") {
+      // This is the actual confirmed-success moment - only here is it safe
+      // to assume the order really happened. clearCart isn't memoized in
+      // CartProvider, so it's deliberately left out of the deps below -
+      // including it would re-run this (and reset the redirect timer) on
+      // every unrelated cart re-render while this page sits on "held".
+      clearCart()
       const timer = setTimeout(() => router.push("/orders"), REDIRECT_DELAY_MS)
       return () => clearTimeout(timer)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payment?.status, router])
 
   useEffect(() => {
@@ -185,7 +194,7 @@ function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
         <AlertTriangle size={48} className="text-accent mx-auto mb-4" />
         <h1 className="text-xl font-bold text-foreground mb-2">Still processing</h1>
         <p className="text-muted-foreground mb-6">
-          Your payment is taking longer than usual to confirm. We'll update your order as soon as it clears.
+          Your payment is taking longer than usual to confirm. We&apos;ll update your order as soon as it clears.
         </p>
         <Button onClick={() => router.push("/orders")} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
           Go to Orders
@@ -199,7 +208,7 @@ function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
       <CallbackShell>
         <Spinner className="mx-auto mb-4 size-10" />
         <h1 className="text-xl font-bold text-foreground mb-2">Confirming your payment...</h1>
-        <p className="text-muted-foreground">Please don't close this page.</p>
+        <p className="text-muted-foreground">Please don&apos;t close this page.</p>
       </CallbackShell>
     )
   }

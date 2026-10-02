@@ -16,7 +16,7 @@ export default function BottomNavigation() {
   }
 
   const handleProtectedNavigation = (path: string) => {
-    if (!isLoggedIn && (path === "/profile" || path === "/chat")) {
+    if (!isLoggedIn && (path === "/profile" || path === "/chat" || path === "/orders")) {
       addNotification("Please log in to continue", "info")
       router.push("/login")
     } else {
@@ -52,6 +52,12 @@ export default function BottomNavigation() {
           badge={items.length > 0 ? items.length : undefined}
           active={pathname === "/cart"}
           onClick={() => router.push("/cart")}
+        />
+        <NavButton
+          icon="📦"
+          label="Orders"
+          active={pathname === "/orders"}
+          onClick={() => handleProtectedNavigation("/orders")}
         />
         <NavButton
           icon="👤"

@@ -12,6 +12,8 @@ import {
   XCircle,
   RotateCcw,
   Star,
+  KeyRound,
+  ShieldAlert,
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -31,6 +33,7 @@ import {
   useOrders,
   useCancelOrder,
   useConfirmDelivery,
+  useOpenDispute,
   getOrderVendorId,
   getOrderVendorName,
   type Order,
@@ -39,7 +42,6 @@ import {
   type OrderStatusHistoryEntry,
 } from "@/lib/api/orders"
 import { useCreateReview } from "@/lib/api/reviews"
-import { useRefundPayment } from "@/lib/api/payments"
 
 const ORDER_STATUS_CONFIG: Record<OrderStatus, { icon: React.ReactNode; label: string; cardClassName: string }> = {
   pending: { icon: <Clock size={20} className="text-muted-foreground" />, label: "Pending", cardClassName: "bg-muted" },
@@ -48,14 +50,26 @@ const ORDER_STATUS_CONFIG: Record<OrderStatus, { icon: React.ReactNode; label: s
   ready: { icon: <Package size={20} className="text-accent" />, label: "Ready", cardClassName: "bg-accent/10" },
   out_for_delivery: { icon: <Truck size={20} className="text-accent" />, label: "Out for Delivery", cardClassName: "bg-accent/10" },
   delivered: { icon: <CheckCircle2 size={20} className="text-green-500" />, label: "Delivered", cardClassName: "bg-green-50" },
+  disputed: { icon: <ShieldAlert size={20} className="text-amber-600" />, label: "Under Review", cardClassName: "bg-amber-50" },
   completed: { icon: <CheckCircle2 size={20} className="text-green-600" />, label: "Completed", cardClassName: "bg-green-50" },
   cancelled: { icon: <XCircle size={20} className="text-destructive" />, label: "Cancelled", cardClassName: "bg-destructive/5" },
   refunded: { icon: <RotateCcw size={20} className="text-muted-foreground" />, label: "Refunded", cardClassName: "bg-muted" },
 }
 
-const CANCELABLE_STATUSES: OrderStatus[] = ["pending", "accepted", "preparing", "ready", "out_for_delivery"]
+// The backend only lets customers cancel before the vendor starts preparing;
+// from then until delivery is confirmed the payment is still held in escrow.
+const CANCELABLE_STATUSES: OrderStatus[] = ["pending", "accepted"]
+const PAYMENT_HELD_STATUSES: OrderStatus[] = ["pending", "accepted", "preparing", "ready", "out_for_delivery"]
+
+// Matches the backend's minimum, so a too-short report is caught before sending.
+const DISPUTE_REASON_MIN_LENGTH = 10
+
+// The code only means anything once there's actually a delivery in motion to
+// verify - showing it earlier or after it's been used would just be noise.
+const DELIVERY_CODE_VISIBLE_STATUSES: OrderStatus[] = ["ready", "out_for_delivery"]
 
 function getProductId(item: OrderItemRecord): string {
+  if (!item.productId) return ""
   return typeof item.productId === "string" ? item.productId : item.productId._id
 }
 
@@ -116,7 +130,7 @@ export default function OrdersPage() {
   const { data: orders, isLoading, isError } = useOrders()
   const cancelOrder = useCancelOrder()
   const confirmDelivery = useConfirmDelivery()
-  const refundPayment = useRefundPayment()
+  const openDispute = useOpenDispute()
   const createReview = useCreateReview()
   const { addNotification } = useNotification()
 
@@ -166,17 +180,16 @@ export default function OrdersPage() {
   }
 
   const handleDispute = async (order: Order) => {
-    if (!disputeReason.trim()) {
-      addNotification("Please describe what went wrong.", "error")
-      return
-    }
-    if (!order.paymentId) {
-      addNotification("This order has no payment on file to dispute.", "error")
+    if (disputeReason.trim().length < DISPUTE_REASON_MIN_LENGTH) {
+      addNotification(`Please describe what went wrong (at least ${DISPUTE_REASON_MIN_LENGTH} characters).`, "error")
       return
     }
     try {
-      await refundPayment.mutateAsync({ paymentId: order.paymentId, reason: disputeReason.trim() })
-      addNotification("Dispute submitted. Your payment has been refunded.", "success")
+      await openDispute.mutateAsync({ id: order._id, reason: disputeReason.trim() })
+      addNotification(
+        "Thanks for reporting this. The payment is on hold while our team reviews it, and we'll let you know the outcome.",
+        "success",
+      )
       closeAction()
     } catch (error) {
       addNotification(error instanceof ApiError ? error.message : "Could not submit this dispute.", "error")
@@ -209,7 +222,7 @@ export default function OrdersPage() {
 
       {/* Orders List */}
       <div className="space-y-4">
-        {orders?.length === 0 && <p className="text-muted-foreground">You haven't placed any orders yet.</p>}
+        {orders?.length === 0 && <p className="text-muted-foreground">You haven&apos;t placed any orders yet.</p>}
 
         {orders?.map((order) => {
           const statusConfig = ORDER_STATUS_CONFIG[order.status]
@@ -248,8 +261,8 @@ export default function OrdersPage() {
                 <div className="space-y-4 pt-4" onClick={(e) => e.stopPropagation()}>
                   {/* Items */}
                   <div className="space-y-1">
-                    {order.items.map((item) => (
-                      <div key={getProductId(item)} className="flex justify-between text-sm">
+                    {order.items.map((item, index) => (
+                      <div key={getProductId(item) || index} className="flex justify-between text-sm">
                         <span className="text-foreground">
                           {item.productName} x{item.quantity}
                         </span>
@@ -257,6 +270,20 @@ export default function OrdersPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Delivery Code */}
+                  {order.deliveryCode && DELIVERY_CODE_VISIBLE_STATUSES.includes(order.status) && (
+                    <Card className="p-4 bg-accent/10 border border-accent/20 flex items-center gap-3">
+                      <KeyRound size={20} className="text-accent shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-accent">Delivery Code</p>
+                        <p className="text-2xl font-bold tracking-widest text-foreground">{order.deliveryCode}</p>
+                        <p className="text-xs text-accent/80">
+                          Give this to the vendor when your order arrives - don&apos;t share it before then.
+                        </p>
+                      </div>
+                    </Card>
+                  )}
 
                   {/* Timeline */}
                   <OrderTimeline history={order.statusHistory} />
@@ -298,8 +325,10 @@ export default function OrdersPage() {
                     </Card>
                   )}
 
+                  {order.dispute && <DisputeNotice dispute={order.dispute} />}
+
                   {/* Escrow notice */}
-                  {CANCELABLE_STATUSES.includes(order.status) && (
+                  {PAYMENT_HELD_STATUSES.includes(order.status) && (
                     <Card className="p-3 bg-accent/10 border border-accent/20 flex-row items-start gap-2">
                       <AlertCircle size={16} className="text-accent shrink-0 mt-0.5" />
                       <div>
@@ -380,10 +409,10 @@ export default function OrdersPage() {
                         <Button
                           variant="destructive"
                           onClick={() => handleDispute(order)}
-                          disabled={refundPayment.isPending}
+                          disabled={openDispute.isPending}
                           className="flex-1"
                         >
-                          {refundPayment.isPending ? "Submitting..." : "Submit Dispute & Refund"}
+                          {openDispute.isPending ? "Submitting..." : "Submit for Review"}
                         </Button>
                       </div>
                     </div>
@@ -424,7 +453,7 @@ export default function OrdersPage() {
                     </Button>
                   )}
                   {order.status === "completed" && reviewedOrderIds.has(order._id) && (
-                    <p className="text-xs text-center text-muted-foreground">You've reviewed this order.</p>
+                    <p className="text-xs text-center text-muted-foreground">You&apos;ve reviewed this order.</p>
                   )}
                 </div>
               )}
@@ -474,10 +503,9 @@ function ReviewDialog({
         vendorId: getOrderVendorId(order),
         rating: overallRating,
         review: comment.trim() || undefined,
-        productRatings: order.items.map((item) => {
-          const productId = getProductId(item)
-          return { productId, rating: productRatings[productId] ?? 5 }
-        }),
+        productRatings: order.items
+          .map((item) => ({ productId: getProductId(item), rating: productRatings[getProductId(item)] ?? 5 }))
+          .filter((entry) => entry.productId),
       })
       addNotification("Thanks for your review!", "success")
       onSubmitted(order._id)
@@ -509,10 +537,10 @@ function ReviewDialog({
             </div>
 
             <div className="space-y-3">
-              {order.items.map((item) => {
+              {order.items.map((item, index) => {
                 const productId = getProductId(item)
                 return (
-                  <div key={productId} className="flex items-center justify-between gap-3">
+                  <div key={productId || index} className="flex items-center justify-between gap-3">
                     <span className="text-sm text-foreground">{item.productName}</span>
                     <StarRating
                       value={productRatings[productId] ?? 5}
@@ -545,5 +573,26 @@ function ReviewDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function DisputeNotice({ dispute }: { dispute: NonNullable<Order["dispute"]> }) {
+  const outcome =
+    dispute.resolution === "refund"
+      ? "Resolved: your payment is being refunded."
+      : dispute.resolution === "release"
+        ? "Resolved: the payment was released to the vendor."
+        : "Our team is reviewing this. The payment is on hold until then."
+
+  return (
+    <Card className="p-3 bg-amber-50 border border-amber-200 flex-row items-start gap-2">
+      <ShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
+      <div className="space-y-1">
+        <p className="text-xs font-semibold text-amber-700">Problem reported</p>
+        <p className="text-xs text-amber-700/80">{dispute.reason}</p>
+        <p className="text-xs font-medium text-amber-700">{outcome}</p>
+        {dispute.resolutionNote && <p className="text-xs text-amber-700/80">{dispute.resolutionNote}</p>}
+      </div>
+    </Card>
   )
 }
