@@ -11,6 +11,7 @@ export type OrderStatus =
   | "ready"
   | "out_for_delivery"
   | "delivered"
+  | "disputed"
   | "completed"
   | "cancelled"
   | "refunded"
@@ -71,6 +72,16 @@ export interface OrderItemRecord {
   flashSaleId?: string
 }
 
+// Opened by the customer on a delivered order; the payment stays held until an
+// admin refunds it or releases it to the vendor.
+export interface OrderDispute {
+  reason: string
+  openedAt: string
+  resolution?: "refund" | "release"
+  resolutionNote?: string
+  resolvedAt?: string
+}
+
 export interface Order {
   _id: string
   orderNumber: string
@@ -88,6 +99,7 @@ export interface Order {
   vendorNotes?: string
   customerNotes?: string
   cancellationReason?: string
+  dispute?: OrderDispute
   rating?: { score: number; review?: string; createdAt: string }
   createdAt: string
   updatedAt: string
@@ -133,6 +145,11 @@ async function cancelOrder(id: string, cancellationReason: string): Promise<Orde
   return json.data
 }
 
+async function openOrderDispute(id: string, reason: string): Promise<Order> {
+  const json = await apiFetch<OrderEnvelope>(`/orders/${id}/dispute`, { method: "POST", body: { reason } })
+  return json.data
+}
+
 export interface ConfirmDeliveryInput {
   rating?: number
   review?: string
@@ -165,6 +182,14 @@ export function useCancelOrder() {
   return useMutation({
     mutationFn: ({ id, cancellationReason }: { id: string; cancellationReason: string }) =>
       cancelOrder(id, cancellationReason),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ordersQueryKey }),
+  })
+}
+
+export function useOpenDispute() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => openOrderDispute(id, reason),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ordersQueryKey }),
   })
 }
