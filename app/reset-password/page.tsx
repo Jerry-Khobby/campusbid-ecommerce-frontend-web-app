@@ -5,7 +5,7 @@ import { Suspense, useState } from "react"
 import { Lock } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { useNotification } from "@/lib/notification-context"
 import { resetPassword } from "@/lib/api/auth"
 import { ApiError } from "@/lib/api/client"
@@ -67,8 +67,7 @@ function ResetPasswordPageInner() {
               <label className="block text-sm font-medium text-foreground mb-2">New Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
-                <Input
-                  type="password"
+                <PasswordInput
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -82,8 +81,7 @@ function ResetPasswordPageInner() {
               <label className="block text-sm font-medium text-foreground mb-2">Confirm New Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
-                <Input
-                  type="password"
+                <PasswordInput
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"

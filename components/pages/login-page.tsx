@@ -6,6 +6,7 @@ import { Mail, Lock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { useUser } from "@/lib/user-context";
 import { useNotification } from "@/lib/notification-context";
 import { ApiError } from "@/lib/api/client";
@@ -103,8 +104,7 @@ export default function LoginPage() {
                   className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
                   size={18}
                 />
-                <Input
-                  type="password"
+                <PasswordInput
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -133,8 +133,7 @@ export default function LoginPage() {
                     className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
                     size={18}
                   />
-                  <Input
-                    type="password"
+                  <PasswordInput
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
