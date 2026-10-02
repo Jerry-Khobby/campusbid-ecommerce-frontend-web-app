@@ -244,3 +244,41 @@ describe("OrdersPage cancellation", () => {
     },
   )
 })
+
+describe("OrdersPage guidance", () => {
+  beforeEach(() => {
+    vi.mocked(useCancelOrder).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any)
+    vi.mocked(useConfirmDelivery).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any)
+    vi.mocked(useCreateReview).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any)
+    vi.mocked(useNotification).mockReturnValue({ addNotification: vi.fn() } as any)
+    vi.mocked(useRefundPayment).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any)
+    vi.mocked(useOpenDispute).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as any)
+  })
+
+  function renderCollapsedOrder(overrides: Partial<Order>) {
+    vi.mocked(useOrders).mockReturnValue({
+      data: [{ ...DELIVERED_ORDER, ...overrides }],
+      isLoading: false,
+      isError: false,
+    } as any)
+    render(<OrdersPage />)
+  }
+
+  it("shows the delivery code without expanding the order", () => {
+    renderCollapsedOrder({ status: "out_for_delivery", deliveryCode: "482193" })
+
+    expect(screen.getByText("482193")).toBeInTheDocument()
+  })
+
+  it("tells the customer what to do next without expanding the order", () => {
+    renderCollapsedOrder({ status: "out_for_delivery", deliveryCode: "482193" })
+
+    expect(screen.getByText(/Give the vendor your delivery code when it arrives/)).toBeInTheDocument()
+  })
+
+  it("shows the expand control so customers know the card opens", () => {
+    renderCollapsedOrder({ status: "pending" })
+
+    expect(screen.getByText("Show details")).toBeInTheDocument()
+  })
+})
