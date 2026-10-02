@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Bell } from "lucide-react"
 import { useUser } from "@/lib/user-context"
@@ -13,6 +14,7 @@ const MAX_BADGE_COUNT = 9
  * Profile > Notifications tab, this is reachable from anywhere in the app. */
 export function NotificationBell() {
   const { isLoggedIn } = useUser()
+  const [isOpen, setIsOpen] = useState(false)
   const { data: notifications } = useQuery({
     queryKey: notificationsQueryKey,
     queryFn: fetchNotifications,
@@ -25,7 +27,7 @@ export function NotificationBell() {
 
   return (
     <div className="fixed top-3 right-3 z-40">
-      <Popover>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <button
             aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
@@ -40,7 +42,7 @@ export function NotificationBell() {
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-80 max-h-[70vh] overflow-y-auto">
-          <NotificationsPanel />
+          <NotificationsPanel onNavigate={() => setIsOpen(false)} />
         </PopoverContent>
       </Popover>
     </div>
