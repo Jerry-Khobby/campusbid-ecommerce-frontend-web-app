@@ -19,7 +19,10 @@ export default function ForgotPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email) return
+    if (!email) {
+      addNotification("Enter the email you signed up with", "error")
+      return
+    }
 
     setIsSubmitting(true)
     try {
@@ -50,14 +53,18 @@ export default function ForgotPasswordPage() {
           {!isSubmitted ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Email Address</label>
+                <label htmlFor="reset-email" className="block text-sm font-medium text-foreground mb-2">
+                  Email Address
+                </label>
                 <div className="relative">
                   <Mail
                     className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
                     size={18}
                   />
                   <Input
+                    id="reset-email"
                     type="email"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
@@ -78,7 +85,7 @@ export default function ForgotPasswordPage() {
           ) : (
             <div className="space-y-4">
               <div className="bg-muted rounded-lg p-4 text-center">
-                <div className="text-4xl mb-2">📧</div>
+                <div className="text-4xl mb-2" aria-hidden="true">📧</div>
                 <p className="text-sm text-muted-foreground">
                   We&apos;ve sent a password reset link to <strong>{email}</strong>
                 </p>
@@ -90,7 +97,7 @@ export default function ForgotPasswordPage() {
           )}
 
           <div className="mt-6 text-center">
-            <Link href="/login" className="text-sm text-accent hover:underline">
+            <Link href="/login" className="inline-block py-1 text-sm text-accent hover:underline">
               Back to Login
             </Link>
           </div>
