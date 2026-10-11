@@ -1,6 +1,7 @@
 "use client"
 
 import ProfilePage from "@/components/pages/profile-page"
+import { Suspense } from "react"
 import { useRequireAuth } from "@/hooks/use-require-auth"
 
 export default function Profile() {
@@ -10,5 +11,10 @@ export default function Profile() {
     return null
   }
 
-  return <ProfilePage />
+  // The page reads its query string (useSearchParams), which needs a Suspense boundary.
+  return (
+    <Suspense fallback={null}>
+      <ProfilePage />
+    </Suspense>
+  )
 }

@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Bell,
@@ -11,6 +12,7 @@ import {
   Edit2,
   Heart,
   Loader2,
+  LocateFixed,
   LogOut,
   MapPin,
   Plus,
@@ -48,6 +50,7 @@ import {
   type ProfileUpdateInput,
 } from "@/lib/api/users"
 import { NotificationsPanel } from "@/components/notifications-panel"
+import { ConfirmDialog } from "@/components/confirm-dialog"
 
 type TabId = "profile" | "addresses" | "payment" | "saved" | "notifications" | "settings"
 
@@ -62,12 +65,9 @@ const TAB_CONFIG: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: "settings", label: "Settings", icon: Settings },
 ]
 
-const NOTIFICATION_PREFERENCES = [
-  { label: "Order Updates", description: "Get notified about order status changes" },
-  { label: "Flash Sales", description: "Receive alerts for new flash sales" },
-  { label: "Bid Notifications", description: "Get notified when you're outbid" },
-  { label: "Promotional Emails", description: "Receive special offers and promotions" },
-]
+function isTabId(value: string | null): value is TabId {
+  return TAB_CONFIG.some((tab) => tab.id === value)
+}
 
 const EMPTY_ADDRESS_FORM: AddressFormValues = {
   label: "",
@@ -89,7 +89,11 @@ const EMPTY_PAYMENT_METHOD_FORM: PaymentMethodInput = {
 export default function ProfilePage() {
   const { user, logout, refetchUser, savedItemIds, toggleSavedItem } = useUser()
   const { addNotification } = useNotification()
-  const [activeTab, setActiveTab] = useState<TabId>("profile")
+  // ?tab=addresses lets other pages (e.g. checkout with no address) link
+  // straight to the section the user needs.
+  const searchParams = useSearchParams()
+  const requestedTab = searchParams.get("tab")
+  const [activeTab, setActiveTab] = useState<TabId>(isTabId(requestedTab) ? requestedTab : "profile")
   const [isEditing, setIsEditing] = useState(false)
   const [editData, setEditData] = useState<ProfileUpdateInput>({})
 
@@ -217,7 +221,9 @@ function ProfileHeaderCard({
               <span className="text-2xl font-bold text-accent-foreground">{getInitials(user)}</span>
             )}
           </div>
-          <label className="absolute bottom-0 right-0 bg-accent text-accent-foreground p-1.5 md:p-1 rounded-full cursor-pointer hover:bg-accent/90 transition-colors">
+          <label
+            aria-label="Change profile photo"
+            className="absolute bottom-0 right-0 bg-accent text-accent-foreground p-1.5 md:p-1 rounded-full cursor-pointer hover:bg-accent/90 transition-colors">
             {isUploadingImage ? (
               <Loader2 size={16} className="md:w-3.5 md:h-3.5 animate-spin" />
             ) : (
@@ -241,8 +247,12 @@ function ProfileHeaderCard({
             Member since {new Date(user.createdAt).toLocaleDateString()}
           </p>
         </div>
-        <button onClick={onStartEdit} className="p-2 hover:bg-muted rounded-lg transition-colors flex-shrink-0">
-          <Edit2 size={20} className="text-muted-foreground" />
+        <button
+          onClick={onStartEdit}
+          aria-label="Edit profile"
+          className="p-2 hover:bg-muted rounded-lg transition-colors flex-shrink-0"
+        >
+          <Edit2 size={20} className="text-muted-foreground" aria-hidden="true" />
         </button>
       </div>
     </Card>
@@ -294,10 +304,13 @@ function EditProfileForm({
 }
 
 function ProfileField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const id = `profile-${label.toLowerCase().replace(/\s+/g, "-")}`
   return (
     <div>
-      <label className="text-sm font-medium text-foreground block mb-2">{label}</label>
-      <Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={label} />
+      <label htmlFor={id} className="text-sm font-medium text-foreground block mb-2">
+        {label}
+      </label>
+      <Input id={id} value={value} onChange={(event) => onChange(event.target.value)} placeholder={label} />
     </div>
   )
 }
@@ -309,13 +322,15 @@ function TabNavigation({ activeTab, onSelectTab }: { activeTab: TabId; onSelectT
         <button
           key={id}
           onClick={() => onSelectTab(id)}
+          aria-label={label}
+          aria-current={activeTab === id ? "page" : undefined}
           className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap text-sm md:text-base ${
             activeTab === id
               ? "bg-accent text-accent-foreground"
               : "bg-muted text-muted-foreground hover:text-foreground"
           }`}
         >
-          <Icon size={16} className="flex-shrink-0" />
+          <Icon size={16} className="flex-shrink-0" aria-hidden="true" />
           <span className="hidden sm:inline">{label}</span>
         </button>
       ))}
@@ -379,7 +394,7 @@ function AddressesSection() {
 
   const handleAddAddress = (values: AddressFormValues) => {
     if (!isValidAddressForm(values)) {
-      addNotification("Please provide a label and valid coordinates", "error")
+      addNotification(getAddressFormError(values) ?? "Please check the address details", "error")
       return
     }
     addAddressMutation.mutate(toAddressInput(values), {
@@ -393,7 +408,7 @@ function AddressesSection() {
 
   const handleUpdateAddress = (id: string, values: AddressFormValues) => {
     if (!isValidAddressForm(values)) {
-      addNotification("Please provide a label and valid coordinates", "error")
+      addNotification(getAddressFormError(values) ?? "Please check the address details", "error")
       return
     }
     updateAddressMutation.mutate(
@@ -502,16 +517,27 @@ function AddressCard({
           )}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={onEdit} className="p-2 hover:bg-muted rounded-lg transition-colors">
-            <Edit2 size={16} className="text-muted-foreground" />
-          </button>
           <button
-            onClick={onDelete}
-            disabled={isDeleting}
-            className="p-2 hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
+            onClick={onEdit}
+            aria-label={`Edit address ${address.label}`}
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
           >
-            <Trash2 size={16} className="text-destructive" />
+            <Edit2 size={16} className="text-muted-foreground" aria-hidden="true" />
           </button>
+          <ConfirmDialog
+            title="Delete this address?"
+            description={`"${address.label}" will be removed from your saved addresses.`}
+            onConfirm={onDelete}
+            trigger={
+              <button
+                disabled={isDeleting}
+                aria-label={`Delete address ${address.label}`}
+                className="p-2 hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={16} className="text-destructive" aria-hidden="true" />
+              </button>
+            }
+          />
         </div>
       </div>
     </Card>
@@ -532,48 +558,159 @@ function AddressFormCard({
   onCancel: () => void
 }) {
   const [values, setValues] = useState(initialValues)
+  const [isLocating, setIsLocating] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  const hasLocation = hasValidCoordinates(values)
+  const [showCoordinates, setShowCoordinates] = useState(false)
+
+  // Vendors deliver to the pinned location, and students don't know their
+  // coordinates by heart — the device's location is the normal way to set it.
+  const handleUseCurrentLocation = () => {
+    if (!("geolocation" in navigator)) {
+      setLocationError("Your browser can't share its location. Enter the coordinates manually below.")
+      setShowCoordinates(true)
+      return
+    }
+    setIsLocating(true)
+    setLocationError(null)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setValues((current) => ({
+          ...current,
+          latitude: position.coords.latitude.toFixed(6),
+          longitude: position.coords.longitude.toFixed(6),
+        }))
+        setIsLocating(false)
+      },
+      (error) => {
+        setIsLocating(false)
+        setShowCoordinates(true)
+        setLocationError(
+          error.code === error.PERMISSION_DENIED
+            ? "Location access was blocked. Allow it in your browser settings, or enter the coordinates manually below."
+            : "Couldn't get your location. Try again, or enter the coordinates manually below.",
+        )
+      },
+      { enableHighAccuracy: true, timeout: 15000 },
+    )
+  }
 
   return (
     <Card className="p-4 md:p-6 border-2 border-accent">
       <div className="space-y-3 mb-4">
-        <Input
-          placeholder="Label (e.g. Dorm Room)"
-          value={values.label}
-          onChange={(event) => setValues({ ...values, label: event.target.value })}
-        />
-        <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="address-label" className="text-sm font-medium text-foreground block mb-1">
+            Label
+          </label>
           <Input
-            placeholder="Building (optional)"
-            value={values.building}
-            onChange={(event) => setValues({ ...values, building: event.target.value })}
-          />
-          <Input
-            placeholder="Room (optional)"
-            value={values.room}
-            onChange={(event) => setValues({ ...values, room: event.target.value })}
+            id="address-label"
+            placeholder="e.g. Dorm Room, Library"
+            value={values.label}
+            onChange={(event) => setValues({ ...values, label: event.target.value })}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Input
-            type="number"
-            step="any"
-            placeholder="Latitude"
-            value={values.latitude}
-            onChange={(event) => setValues({ ...values, latitude: event.target.value })}
-          />
-          <Input
-            type="number"
-            step="any"
-            placeholder="Longitude"
-            value={values.longitude}
-            onChange={(event) => setValues({ ...values, longitude: event.target.value })}
+          <div>
+            <label htmlFor="address-building" className="text-sm font-medium text-foreground block mb-1">
+              Building <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <Input
+              id="address-building"
+              value={values.building}
+              onChange={(event) => setValues({ ...values, building: event.target.value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="address-room" className="text-sm font-medium text-foreground block mb-1">
+              Room <span className="text-muted-foreground font-normal">(optional)</span>
+            </label>
+            <Input
+              id="address-room"
+              value={values.room}
+              onChange={(event) => setValues({ ...values, room: event.target.value })}
+            />
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-muted p-3 space-y-2">
+          <p className="text-sm font-medium text-foreground">Delivery location</p>
+          <p className="text-xs text-muted-foreground" role="status">
+            {hasLocation
+              ? `Location set (${Number(values.latitude).toFixed(4)}, ${Number(values.longitude).toFixed(4)})`
+              : "Stand at this address and use your current location so vendors can find you."}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleUseCurrentLocation}
+            disabled={isLocating}
+            className="w-full flex items-center justify-center gap-2"
+          >
+            {isLocating ? (
+              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <LocateFixed size={16} aria-hidden="true" />
+            )}
+            {isLocating ? "Getting your location..." : hasLocation ? "Update to my current location" : "Use my current location"}
+          </Button>
+          {locationError && (
+            <p className="text-xs text-destructive" role="alert">
+              {locationError}
+            </p>
+          )}
+          {showCoordinates ? (
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <div>
+                <label htmlFor="address-latitude" className="text-xs text-muted-foreground block mb-1">
+                  Latitude
+                </label>
+                <Input
+                  id="address-latitude"
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  placeholder="e.g. 5.6502"
+                  value={values.latitude}
+                  onChange={(event) => setValues({ ...values, latitude: event.target.value })}
+                />
+              </div>
+              <div>
+                <label htmlFor="address-longitude" className="text-xs text-muted-foreground block mb-1">
+                  Longitude
+                </label>
+                <Input
+                  id="address-longitude"
+                  type="number"
+                  step="any"
+                  inputMode="decimal"
+                  placeholder="e.g. -0.1869"
+                  value={values.longitude}
+                  onChange={(event) => setValues({ ...values, longitude: event.target.value })}
+                />
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowCoordinates(true)}
+              className="py-1 text-xs text-accent hover:underline"
+            >
+              Enter coordinates manually instead
+            </button>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="address-instructions" className="text-sm font-medium text-foreground block mb-1">
+            Delivery instructions <span className="text-muted-foreground font-normal">(optional)</span>
+          </label>
+          <Textarea
+            id="address-instructions"
+            placeholder="e.g. Call when you reach the porter's lodge"
+            value={values.instructions}
+            onChange={(event) => setValues({ ...values, instructions: event.target.value })}
           />
         </div>
-        <Textarea
-          placeholder="Delivery instructions (optional)"
-          value={values.instructions}
-          onChange={(event) => setValues({ ...values, instructions: event.target.value })}
-        />
         <label className="flex items-center gap-2 text-sm text-foreground">
           <Checkbox
             checked={values.isDefault}
@@ -603,10 +740,29 @@ function AddressFormCard({
   )
 }
 
-function isValidAddressForm(values: AddressFormValues): boolean {
+// Number("") is 0, so an empty field has to be ruled out explicitly — otherwise
+// a blank location saves as 0,0 (the Gulf of Guinea).
+function hasValidCoordinates(values: AddressFormValues): boolean {
+  if (values.latitude.trim() === "" || values.longitude.trim() === "") return false
   const latitude = Number(values.latitude)
   const longitude = Number(values.longitude)
-  return values.label.trim().length > 0 && Number.isFinite(latitude) && Number.isFinite(longitude)
+  return (
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    Math.abs(latitude) <= 90 &&
+    Math.abs(longitude) <= 180
+  )
+}
+
+/** The first problem with the form as a user-facing message, or null if it's valid. */
+function getAddressFormError(values: AddressFormValues): string | null {
+  if (values.label.trim().length === 0) return "Give the address a label, e.g. Dorm Room"
+  if (!hasValidCoordinates(values)) return "Set the delivery location with \"Use my current location\""
+  return null
+}
+
+function isValidAddressForm(values: AddressFormValues): boolean {
+  return getAddressFormError(values) === null
 }
 
 function toAddressInput(values: AddressFormValues): AddressInput {
@@ -742,13 +898,21 @@ function PaymentMethodRow({
         {method.isDefault && (
           <span className="text-xs bg-accent text-accent-foreground px-2 py-1 rounded">Default</span>
         )}
-        <button
-          onClick={onDelete}
-          disabled={isDeleting}
-          className="p-1.5 hover:bg-background rounded-lg transition-colors disabled:opacity-50"
-        >
-          <Trash2 size={16} className="text-destructive" />
-        </button>
+        <ConfirmDialog
+          title="Remove this payment method?"
+          description={`${method.provider} •••• ${method.last4} will be removed from your saved payment methods.`}
+          confirmLabel="Remove"
+          onConfirm={onDelete}
+          trigger={
+            <button
+              disabled={isDeleting}
+              aria-label={`Remove payment method ${method.provider} ending ${method.last4}`}
+              className="p-2 hover:bg-background rounded-lg transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={16} className="text-destructive" aria-hidden="true" />
+            </button>
+          }
+        />
       </div>
     </div>
   )
@@ -768,6 +932,7 @@ function AddPaymentMethodForm({
   return (
     <div className="mt-4 space-y-3 p-3 border border-border rounded-lg">
       <select
+        aria-label="Payment method type"
         value={values.type}
         onChange={(event) => setValues({ ...values, type: event.target.value })}
         className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm text-foreground"
@@ -776,11 +941,14 @@ function AddPaymentMethodForm({
         <option value="mobile_money">Mobile Money</option>
       </select>
       <Input
+        aria-label={values.type === "mobile_money" ? "Network" : "Card provider"}
         placeholder={values.type === "mobile_money" ? "Network (e.g. MTN, Vodafone, AirtelTigo)" : "Provider (e.g. Visa, Mastercard)"}
         value={values.provider}
         onChange={(event) => setValues({ ...values, provider: event.target.value })}
       />
       <Input
+        aria-label={values.type === "mobile_money" ? "Phone number" : "Last 4 digits of the card"}
+        inputMode="numeric"
         placeholder={values.type === "mobile_money" ? "Phone Number" : "Last 4 digits"}
         maxLength={values.type === "mobile_money" ? 15 : 4}
         value={values.last4}
@@ -866,8 +1034,12 @@ function SavedItemCard({ item, onRemove }: { item: Product; onRemove: () => void
             <p className="text-sm md:text-base font-bold text-accent mt-1">{formatCurrency(displayPrice)}</p>
           </div>
         </div>
-        <button onClick={onRemove} className="p-2 hover:bg-muted rounded-lg transition-colors flex-shrink-0">
-          <X size={18} className="md:w-5 md:h-5 text-muted-foreground" />
+        <button
+          onClick={onRemove}
+          aria-label={`Remove ${item.name} from saved items`}
+          className="p-2 hover:bg-muted rounded-lg transition-colors flex-shrink-0"
+        >
+          <X size={18} className="md:w-5 md:h-5 text-muted-foreground" aria-hidden="true" />
         </button>
       </div>
     </Card>
@@ -877,24 +1049,6 @@ function SavedItemCard({ item, onRemove }: { item: Product; onRemove: () => void
 function SettingsSection({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="space-y-4">
-      <Card className="p-4">
-        <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-sm md:text-base">
-          <Bell size={18} />
-          Notification Preferences
-        </h3>
-        <div className="space-y-3">
-          {NOTIFICATION_PREFERENCES.map((preference) => (
-            <div key={preference.label} className="flex items-center justify-between gap-3 p-3 bg-muted rounded-lg">
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-foreground text-sm md:text-base">{preference.label}</p>
-                <p className="text-xs text-muted-foreground">{preference.description}</p>
-              </div>
-              <input type="checkbox" defaultChecked className="w-4 h-4 rounded flex-shrink-0" />
-            </div>
-          ))}
-        </div>
-      </Card>
-
       <Card className="p-4">
         <h3 className="font-semibold text-foreground mb-4 text-sm md:text-base">Account Actions</h3>
         <Button
