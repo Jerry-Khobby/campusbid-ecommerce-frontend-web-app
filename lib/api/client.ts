@@ -150,8 +150,35 @@ async function performFetch(path: string, options: RequestOptions, retryOn401: b
 }
 
 /** Calls the backend's JSON REST API. Throws ApiError on any non-2xx response. */
+// How many API requests are in flight right now, so the UI can tell a slow
+// backend (it sleeps when idle) apart from a normal wait — see
+// components/server-wake-banner.tsx. Counted here rather than through React
+// Query so direct calls like login and session restore are covered too.
+let pendingRequestCount = 0
+const pendingRequestListeners = new Set<() => void>()
+
+export function getPendingRequestCount(): number {
+  return pendingRequestCount
+}
+
+export function subscribeToPendingRequests(listener: () => void): () => void {
+  pendingRequestListeners.add(listener)
+  return () => pendingRequestListeners.delete(listener)
+}
+
+async function trackPending<T>(request: Promise<T>): Promise<T> {
+  pendingRequestCount += 1
+  pendingRequestListeners.forEach((listener) => listener())
+  try {
+    return await request
+  } finally {
+    pendingRequestCount -= 1
+    pendingRequestListeners.forEach((listener) => listener())
+  }
+}
+
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const response = await performFetch(path, options, true)
+  const response = await trackPending(performFetch(path, options, true))
 
   if (!response.ok) {
     throw await toApiError(response)
@@ -167,7 +194,7 @@ export async function apiUpload<T>(path: string, formData: FormData, method: "PO
   const headers: Record<string, string> = {}
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const response = await fetch(buildUrl(path), { method, headers, body: formData })
+  const response = await trackPending(fetch(buildUrl(path), { method, headers, body: formData }))
 
   if (!response.ok) {
     throw await toApiError(response)
