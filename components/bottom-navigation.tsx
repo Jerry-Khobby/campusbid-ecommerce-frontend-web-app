@@ -7,7 +7,7 @@ import { useNotification } from "@/lib/notification-context"
 export default function BottomNavigation() {
   const pathname = usePathname()
   const router = useRouter()
-  const { items } = useCart()
+  const { itemCount } = useCart()
   const { isLoggedIn } = useUser()
   const { addNotification } = useNotification()
 
@@ -49,7 +49,7 @@ export default function BottomNavigation() {
         <NavButton
           icon="🛒"
           label="Cart"
-          badge={items.length > 0 ? items.length : undefined}
+          badge={itemCount > 0 ? itemCount : undefined}
           active={pathname === "/cart"}
           onClick={() => router.push("/cart")}
         />
@@ -86,19 +86,23 @@ function NavButton({
   return (
     <button
       onClick={onClick}
+      aria-current={active ? "page" : undefined}
       className={`flex flex-col items-center justify-center gap-0.5 md:gap-1 py-2 px-2 md:px-3 transition-colors relative min-w-0 ${
         active ? "text-accent" : "text-muted-foreground hover:text-foreground"
       }`}
     >
-      <div className="relative text-xl md:text-2xl">
+      <div className="relative text-xl md:text-2xl" aria-hidden="true">
         {icon}
         {badge && (
-          <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-xs font-bold rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center">
-            {badge}
+          <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-xs font-bold rounded-full min-w-4 h-4 md:min-w-5 md:h-5 px-1 flex items-center justify-center">
+            {badge > 99 ? "99+" : badge}
           </span>
         )}
       </div>
-      <span className="text-[10px] md:text-xs font-medium truncate max-w-full">{label}</span>
+      <span className="text-[10px] md:text-xs font-medium truncate max-w-full">
+        {label}
+        {badge ? <span className="sr-only"> ({badge})</span> : null}
+      </span>
     </button>
   )
 }

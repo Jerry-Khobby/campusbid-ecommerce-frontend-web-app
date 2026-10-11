@@ -17,9 +17,15 @@ interface CartContextType {
   items: CartItem[]
   addItem: (item: Omit<CartItem, "quantity">) => void
   removeItem: (id: string) => void
+  /** Puts a removed item back where it was — backs the "Undo" on removal. */
+  restoreItem: (item: CartItem, index: number) => void
   updateQuantity: (id: string, quantity: number) => void
   clearCart: () => void
+  /** Drops one vendor's items after that vendor's order is paid, keeping the rest. */
+  clearVendorItems: (vendorId: string) => void
   total: number
+  /** Sum of quantities, not distinct lines — what "N items" should count. */
+  itemCount: number
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined)
@@ -65,6 +71,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => persist(prev.filter((i) => i.id !== id)))
   }
 
+  const restoreItem = (item: CartItem, index: number) => {
+    setItems((prev) => {
+      if (prev.some((i) => i.id === item.id)) return prev
+      const next = [...prev]
+      next.splice(Math.min(index, next.length), 0, item)
+      return persist(next)
+    })
+  }
+
   const updateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
       removeItem(id)
@@ -77,10 +92,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems(persist([]))
   }
 
+  const clearVendorItems = (vendorId: string) => {
+    setItems((prev) => persist(prev.filter((i) => i.vendorId !== vendorId)))
+  }
+
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0)
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, total }}>
+    <CartContext.Provider
+      value={{ items, addItem, removeItem, restoreItem, updateQuantity, clearCart, clearVendorItems, total, itemCount }}
+    >
       {children}
     </CartContext.Provider>
   )
