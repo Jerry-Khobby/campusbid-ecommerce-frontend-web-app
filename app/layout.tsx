@@ -21,7 +21,10 @@ const geistSans = Geist({ subsets: ["latin"] });
 const geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CampusBid - Campus Marketplace",
+  title: {
+    default: "CampusBid - Campus Marketplace",
+    template: "%s · CampusBid",
+  },
   description: "Buy and bid on items from campus vendors",
 };
 
