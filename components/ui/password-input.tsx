@@ -17,7 +17,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, Omit<React.ComponentPro
           type="button"
           tabIndex={-1}
           onClick={() => setIsVisible((current) => !current)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
           aria-label={isVisible ? "Hide password" : "Show password"}
         >
           {isVisible ? <EyeOff size={18} /> : <Eye size={18} />}
