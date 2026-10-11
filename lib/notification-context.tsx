@@ -3,16 +3,27 @@
 import type React from "react"
 import { createContext, useContext, useState, useCallback } from "react"
 
+export interface NotificationAction {
+  label: string
+  onClick: () => void
+}
+
 export interface Notification {
   id: string
   message: string
   type: "success" | "info" | "warning" | "error"
   duration?: number
+  action?: NotificationAction
 }
 
 interface NotificationContextType {
   notifications: Notification[]
-  addNotification: (message: string, type?: Notification["type"], duration?: number) => void
+  addNotification: (
+    message: string,
+    type?: Notification["type"],
+    duration?: number,
+    action?: NotificationAction,
+  ) => void
   removeNotification: (id: string) => void
 }
 
@@ -22,6 +33,15 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 // millisecond (e.g. two queries failing back-to-back on page load), producing
 // duplicate React keys — this counter guarantees a unique id regardless of timing.
 let notificationIdCounter = 0
+
+// Errors and warnings usually tell the user to do something, so they stay up
+// long enough to actually be read; confirmations can go quickly.
+const DEFAULT_DURATION_MS: Record<Notification["type"], number> = {
+  success: 3000,
+  info: 3000,
+  warning: 6000,
+  error: 6000,
+}
 
 function createNotificationId(): string {
   notificationIdCounter += 1
@@ -35,9 +55,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     setNotifications((prev) => prev.filter((n) => n.id !== id))
   }, [])
 
-  const addNotification = useCallback((message: string, type: Notification["type"] = "info", duration = 3000) => {
+  const addNotification = useCallback((
+    message: string,
+    type: Notification["type"] = "info",
+    duration: number = DEFAULT_DURATION_MS[type],
+    action?: NotificationAction,
+  ) => {
     const id = createNotificationId()
-    const notification: Notification = { id, message, type, duration }
+    const notification: Notification = { id, message, type, duration, action }
 
     setNotifications((prev) => [...prev, notification])
 
