@@ -58,7 +58,7 @@ function PaymentCallbackPageInner() {
 
 function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
   const router = useRouter()
-  const { clearCart } = useCart()
+  const { clearVendorItems } = useCart()
   const { addNotification } = useNotification()
   const initializePayment = useInitializePayment()
   const submitMomoOtp = useSubmitMomoOtp()
@@ -90,11 +90,13 @@ function PaymentStatusPoller({ paymentId }: { paymentId: string }) {
   useEffect(() => {
     if (payment?.status === "held") {
       // This is the actual confirmed-success moment - only here is it safe
-      // to assume the order really happened. clearCart isn't memoized in
-      // CartProvider, so it's deliberately left out of the deps below -
-      // including it would re-run this (and reset the redirect timer) on
-      // every unrelated cart re-render while this page sits on "held".
-      clearCart()
+      // to assume the order really happened. Only this vendor's items are
+      // cleared: an order covers one vendor, and items from other vendors
+      // stay in the cart for their own checkout. clearVendorItems isn't
+      // memoized in CartProvider, so it's deliberately left out of the deps
+      // below - including it would re-run this (and reset the redirect timer)
+      // on every unrelated cart re-render while this page sits on "held".
+      clearVendorItems(payment.vendorId)
       const timer = setTimeout(() => router.push("/orders"), REDIRECT_DELAY_MS)
       return () => clearTimeout(timer)
     }

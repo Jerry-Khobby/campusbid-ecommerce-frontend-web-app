@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft, Lock, MapPin } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -40,6 +40,7 @@ function groupItemsByVendor(items: CartItem[]): Map<string, CartItem[]> {
 
 export default function CheckoutPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { items } = useCart()
   const { user } = useUser()
   const { addNotification } = useNotification()
@@ -48,7 +49,12 @@ export default function CheckoutPage() {
   const submitMomoOtp = useSubmitMomoOtp()
 
   const vendorGroups = useMemo(() => groupItemsByVendor(items), [items])
-  const singleVendorItems = vendorGroups.size === 1 ? [...vendorGroups.values()][0] : []
+  // The cart links here with ?vendor=<id> for the vendor being checked out;
+  // with a single vendor in the cart the param isn't needed.
+  const requestedVendorId = searchParams.get("vendor")
+  const singleVendorItems =
+    (requestedVendorId ? vendorGroups.get(requestedVendorId) : undefined) ??
+    (vendorGroups.size === 1 ? [...vendorGroups.values()][0] : [])
   const vendorId = singleVendorItems[0]?.vendorId ?? ""
   const vendorName = singleVendorItems[0]?.vendor ?? ""
 
@@ -149,7 +155,7 @@ export default function CheckoutPage() {
         </div>
         <Card className="p-8 text-center">
           <p className="text-muted-foreground mb-6">Your cart is empty.</p>
-          <Button onClick={() => router.push("/")} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+          <Button onClick={() => router.push("/home")} className="bg-accent hover:bg-accent/90 text-accent-foreground">
             Continue Shopping
           </Button>
         </Card>
@@ -157,22 +163,36 @@ export default function CheckoutPage() {
     )
   }
 
-  if (vendorGroups.size > 1) {
-    const vendorNames = [...vendorGroups.values()].map((group) => group[0].vendor)
+  if (singleVendorItems.length === 0) {
     return (
       <main className="w-full max-w-2xl mx-auto px-4 py-6">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Checkout</h1>
         </div>
         <Card className="p-6">
-          <h2 className="text-xl font-bold text-foreground mb-2">One vendor at a time</h2>
+          <h2 className="text-xl font-bold text-foreground mb-2">Choose a vendor to check out</h2>
           <p className="text-muted-foreground mb-4">
-            Your cart has items from multiple vendors ({vendorNames.join(", ")}). Orders can only be placed with one
-            vendor at a time — please remove items from the other vendors before checking out.
+            Your cart has items from several vendors. Each vendor is a separate order; the others stay in your cart.
           </p>
-          <Button onClick={() => router.push("/cart")} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-            Go to Cart
-          </Button>
+          <div className="space-y-3">
+            {[...vendorGroups.values()].map((group) => {
+              const groupSubtotal = group.reduce((sum, item) => sum + item.price * item.quantity, 0)
+              const groupCount = group.reduce((sum, item) => sum + item.quantity, 0)
+              return (
+                <Button
+                  key={group[0].vendorId}
+                  onClick={() => router.push(`/checkout?vendor=${encodeURIComponent(group[0].vendorId)}`)}
+                  variant="outline"
+                  className="w-full h-auto py-3 flex items-center justify-between"
+                >
+                  <span className="font-semibold">{group[0].vendor}</span>
+                  <span className="text-muted-foreground">
+                    {groupCount} {groupCount === 1 ? "item" : "items"} · {formatCurrency(groupSubtotal)}
+                  </span>
+                </Button>
+              )
+            })}
+          </div>
         </Card>
       </main>
     )
@@ -189,8 +209,11 @@ export default function CheckoutPage() {
           <p className="text-muted-foreground mb-4">
             You need a saved delivery address before you can check out.
           </p>
-          <Button onClick={() => router.push("/profile")} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
-            Go to Profile
+          <Button
+            onClick={() => router.push("/profile?tab=addresses")}
+            className="w-full bg-accent hover:bg-accent/90 text-accent-foreground"
+          >
+            Add an address
           </Button>
         </Card>
       </main>
@@ -201,8 +224,12 @@ export default function CheckoutPage() {
     <main className="w-full max-w-2xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="mb-8 flex items-center gap-3">
-        <button onClick={() => router.push("/cart")} className="p-2 hover:bg-muted rounded-lg transition-colors">
-          <ArrowLeft size={24} className="text-foreground" />
+        <button
+          onClick={() => router.push("/cart")}
+          aria-label="Back to cart"
+          className="p-2 hover:bg-muted rounded-lg transition-colors"
+        >
+          <ArrowLeft size={24} className="text-foreground" aria-hidden="true" />
         </button>
         <div>
           <h1 className="text-3xl font-bold text-foreground">Checkout</h1>

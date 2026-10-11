@@ -1,6 +1,7 @@
 "use client"
 
 import CheckoutPage from "@/components/pages/checkout-page"
+import { Suspense } from "react"
 import { useRequireAuth } from "@/hooks/use-require-auth"
 
 export default function Checkout() {
@@ -10,5 +11,10 @@ export default function Checkout() {
     return null
   }
 
-  return <CheckoutPage />
+  // The page reads its query string (useSearchParams), which needs a Suspense boundary.
+  return (
+    <Suspense fallback={null}>
+      <CheckoutPage />
+    </Suspense>
+  )
 }
