@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation"
 import { useQuery } from "@tanstack/react-query"
 import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { useCart } from "@/lib/cart-context"
+import { useAddToCart } from "@/hooks/use-add-to-cart"
+import { pluralize } from "@/lib/format"
 import { useUser } from "@/lib/user-context"
 import { useNotification } from "@/lib/notification-context"
 import { fetchProducts, type Product } from "@/lib/api/products"
@@ -25,7 +26,7 @@ const SKELETON_CARD_COUNT = 10
 
 export default function SearchPage() {
   const router = useRouter()
-  const { addItem } = useCart()
+  const addToCart = useAddToCart()
   const { savedItemIds, toggleSavedItem } = useUser()
   const { addNotification } = useNotification()
 
@@ -85,17 +86,7 @@ export default function SearchPage() {
     router.push(`/product/${product._id}`)
   }
 
-  const handleAddToCart = (product: Product) => {
-    addItem({
-      id: product._id,
-      vendorId: product.vendorId,
-      name: product.name,
-      vendor: product.vendorName ?? "Vendor",
-      price: product.discountPrice ?? product.price,
-      image: product.images[0] ?? "/placeholder.svg",
-    })
-    addNotification(`${product.name} added to cart`, "success")
-  }
+  const handleAddToCart = (product: Product) => addToCart(product)
 
   const handleToggleSave = (product: Product) => {
     const wasSaved = savedItemIds.includes(product._id)
@@ -124,8 +115,9 @@ export default function SearchPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={20} />
           <Input
-            type="text"
-            placeholder="Search items, vendors, categories..."
+            type="search"
+            aria-label="Search items and vendors"
+            placeholder="Search items and vendors..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="pl-10 py-6 text-base"
@@ -146,8 +138,11 @@ export default function SearchPage() {
           <span className="px-3 py-1 rounded-full bg-accent text-accent-foreground font-medium">
             {vendorFilter.name}
           </span>
-          <button onClick={() => setVendorFilter(null)} className="text-muted-foreground hover:text-foreground underline">
-            Clear
+          <button
+            onClick={() => setVendorFilter(null)}
+            className="py-1 text-muted-foreground hover:text-foreground underline"
+          >
+            Clear<span className="sr-only"> vendor filter</span>
           </button>
         </div>
       )}
@@ -175,7 +170,7 @@ export default function SearchPage() {
                     >
                       <OptimizedImage
                         src={vendor.profile.logo ?? "/placeholder.svg"}
-                        alt={vendor.profile.businessName}
+                        alt=""
                         className="w-8 h-8 rounded-full object-cover"
                       />
                       <span className="text-sm font-medium text-foreground">{vendor.profile.businessName}</span>
@@ -187,8 +182,8 @@ export default function SearchPage() {
 
             {(!isSearching || searchProducts.length > 0) && (
               <>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {isSearching ? searchProducts.length : productsQuery.data?.total} items found
+                <p className="text-sm text-muted-foreground mb-4" role="status">
+                  {pluralize(isSearching ? searchProducts.length : (productsQuery.data?.total ?? 0), "item")} found
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                   {products.map((product) => (
