@@ -1,16 +1,18 @@
 "use client"
 
+import { useEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowLeft, MapPin, Star, MessageSquare, Plus, CheckCircle2, Heart } from "lucide-react"
+import { ArrowLeft, Package, Star, MessageSquare, Plus, CheckCircle2, Heart, SearchX } from "lucide-react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/format"
-import { useCart } from "@/lib/cart-context"
+import { useAddToCart } from "@/hooks/use-add-to-cart"
 import { useUser } from "@/lib/user-context"
 import { useNotification } from "@/lib/notification-context"
 import { useRequireLoginAction } from "@/hooks/use-require-login-action"
-import { apiFetch } from "@/lib/api/client"
+import { ApiError, apiFetch } from "@/lib/api/client"
 import { fetchProduct, fetchProducts } from "@/lib/api/products"
 import { startConversation } from "@/lib/api/chat"
 import { useVendorReviews, type VendorReview } from "@/lib/api/reviews"
@@ -46,7 +48,7 @@ interface ProductDetailPageProps {
 
 export default function ProductDetailPage({ productId }: ProductDetailPageProps) {
   const router = useRouter()
-  const { addItem } = useCart()
+  const addToCart = useAddToCart()
   const { savedItemIds, toggleSavedItem } = useUser()
   const { addNotification } = useNotification()
   const requireLogin = useRequireLoginAction()
@@ -66,8 +68,21 @@ export default function ProductDetailPage({ productId }: ProductDetailPageProps)
     enabled: Boolean(vendorId),
   })
 
+  const productName = productQuery.data?.name
+  useEffect(() => {
+    if (productName) document.title = `${productName} · CampusBid`
+  }, [productName])
+
   if (productQuery.isLoading) {
     return <ProductDetailSkeleton />
+  }
+
+  // A malformed id comes back as 400 and a deleted product as 404 — either
+  // way retrying can't help, so offer a way back instead.
+  const isMissingProduct =
+    productQuery.error instanceof ApiError && (productQuery.error.status === 400 || productQuery.error.status === 404)
+  if (isMissingProduct || (!productQuery.isError && !productQuery.data)) {
+    return <ProductNotFound />
   }
 
   if (productQuery.isError || !productQuery.data) {
@@ -82,20 +97,16 @@ export default function ProductDetailPage({ productId }: ProductDetailPageProps)
   }
 
   const product = productQuery.data
-  const vendorName = vendorQuery.data?.profile.businessName ?? "Vendor"
+  const vendorName = vendorQuery.data?.profile.businessName ?? product.vendorName ?? "this vendor"
   const displayPrice = product.discountPrice ?? product.price
   const vendorProducts = (vendorProductsQuery.data?.items ?? []).filter((item) => item._id !== product._id).slice(0, MAX_VENDOR_PRODUCTS_SHOWN)
 
-  const handleAddToCart = () => {
-    addItem({
-      id: product._id,
-      vendorId: product.vendorId,
-      name: product.name,
-      vendor: vendorName,
-      price: displayPrice,
-      image: product.images[0] ?? "/placeholder.svg",
-    })
-    addNotification(`${product.name} added to cart`, "success")
+  const handleAddToCart = () => addToCart(product, vendorQuery.data?.profile.businessName)
+
+  // A shared link opened in a fresh tab has no page to go back to.
+  const handleBack = () => {
+    if (window.history.length > 1) router.back()
+    else router.push("/home")
   }
 
   const handleChatWithVendor = () => {
@@ -115,10 +126,10 @@ export default function ProductDetailPage({ productId }: ProductDetailPageProps)
   return (
     <main className="w-full max-w-4xl mx-auto px-4 py-6">
       <button
-        onClick={() => router.back()}
+        onClick={handleBack}
         className="flex items-center gap-2 text-accent hover:text-accent/80 mb-6 font-semibold"
       >
-        <ArrowLeft size={20} />
+        <ArrowLeft size={20} aria-hidden="true" />
         Back
       </button>
 
@@ -167,8 +178,8 @@ export default function ProductDetailPage({ productId }: ProductDetailPageProps)
               className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-3 flex items-center justify-center gap-2"
               loadingDuration={1000}
             >
-              <Plus size={20} />
-              Add to Cart
+              <Plus size={20} aria-hidden="true" />
+              {product.isAvailable ? "Add to Cart" : "Currently unavailable"}
             </ButtonWithLoader>
 
             <Button
@@ -197,25 +208,27 @@ export default function ProductDetailPage({ productId }: ProductDetailPageProps)
           <h2 className="text-2xl font-bold text-foreground mb-4">More from {vendorName}</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {vendorProducts.map((vendorProduct) => (
-              <Card
+              <Link
                 key={vendorProduct._id}
-                className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => router.push(`/product/${vendorProduct._id}`)}
+                href={`/product/${vendorProduct._id}`}
+                className="rounded-xl focus-visible:outline-2 focus-visible:outline-accent"
               >
-                <div className="aspect-square bg-muted overflow-hidden">
-                  <OptimizedImage
-                    src={vendorProduct.images[0] ?? "/placeholder.svg"}
-                    alt={vendorProduct.name}
-                    className="w-full h-full"
-                  />
-                </div>
-                <div className="p-2">
-                  <h3 className="font-semibold text-xs text-foreground line-clamp-2 mb-1">{vendorProduct.name}</h3>
-                  <p className="text-xs text-accent font-bold">
-                    {formatCurrency(vendorProduct.discountPrice ?? vendorProduct.price)}
-                  </p>
-                </div>
-              </Card>
+                <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow">
+                  <div className="aspect-square bg-muted overflow-hidden">
+                    <OptimizedImage
+                      src={vendorProduct.images[0] ?? "/placeholder.svg"}
+                      alt=""
+                      className="w-full h-full"
+                    />
+                  </div>
+                  <div className="p-2">
+                    <h3 className="font-semibold text-xs text-foreground line-clamp-2 mb-1">{vendorProduct.name}</h3>
+                    <p className="text-xs text-accent font-bold">
+                      {formatCurrency(vendorProduct.discountPrice ?? vendorProduct.price)}
+                    </p>
+                  </div>
+                </Card>
+              </Link>
             ))}
           </div>
         </div>
@@ -312,13 +325,29 @@ function VendorSummaryCard({ vendorQuery }: { vendorQuery: ReturnType<typeof use
             <span className="text-xs text-muted-foreground">({vendor.rating.count} reviews)</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <MapPin size={12} />
-            {vendor.stats.totalOrders} orders fulfilled
+            <Package size={12} aria-hidden="true" />
+            {vendor.stats.totalOrders} {vendor.stats.totalOrders === 1 ? "order" : "orders"} fulfilled
             {vendor.isOpen ? " · Open now" : " · Closed now"}
           </div>
         </div>
       </div>
     </Card>
+  )
+}
+
+function ProductNotFound() {
+  return (
+    <main className="w-full max-w-md mx-auto px-4 py-16 flex flex-col items-center text-center gap-4">
+      <SearchX size={48} className="text-muted-foreground" aria-hidden="true" />
+      <h1 className="text-2xl font-bold text-foreground">Product not found</h1>
+      <p className="text-muted-foreground">This item may have been removed by the vendor, or the link is incomplete.</p>
+      <Link
+        href="/home"
+        className="inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 font-semibold text-accent-foreground hover:bg-accent/90"
+      >
+        Back to shop
+      </Link>
+    </main>
   )
 }
 
